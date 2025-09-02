@@ -33,9 +33,22 @@
             font-size: 16px;
             box-sizing: border-box;
         }
+        /* Стили для невалидных полей */
+        input:invalid, textarea:invalid {
+            border-color: #ff4444;
+        }
+        input:valid, textarea:valid {
+            border-color: #00aa00;
+        }
         textarea {
-            height: 30vh; /* 30% от высоты экрана. Было 200px; */
+            height: 30vh;
             resize: vertical;
+        }
+        .error-message {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
         }
         .submit-btn {
             width: 100%;
@@ -46,6 +59,10 @@
             border-radius: 6px;
             font-size: 16px;
             cursor: pointer;
+            opacity: 0.5;
+        }
+        .submit-btn:enabled {
+            opacity: 1;
         }
     </style>
 </head>
@@ -54,37 +71,116 @@
         <h1>Заявка на компенсацию</h1>
         <form id="advanceForm">
             <div class="form-group">
-                <label for="amount">Сумма компенсации (руб.)</label>
-                <input type="number" id="amount" name="amount" required min="0" placeholder="Введите сумму (0 - если компенсация не нужен)">
+                <label for="amount">Сумма компенсации (руб.) *</label>
+                <input type="number" id="amount" name="amount" required min="0" 
+                       placeholder="Введите сумму (0 - если компенсация не нужна)">
+                <div class="error-message" id="amount-error">Пожалуйста, укажите сумму компенсации</div>
             </div>
             
             <div class="form-group">
-                <label for="reason">Обоснование компенсации</label>
-                <textarea id="reason" name="reason" required 
-    placeholder="Пример:
+                <label for="reason">Обоснование компенсации *</label>
+                <textarea id="reason" name="reason" required minlength="10"
+                    placeholder="Пример:
 1. Билет Москва-Магнитогорск, 10 000 рублей
-ПРИ ОТСУТСТВИИ НЕОБХОДИМОСТИ напечатать Компенсация не требуется">
-</textarea>
+ПРИ ОТСУТСТВИИ НЕОБХОДИМОСТИ напечатать 'Компенсация не требуется'"></textarea>
+                <div class="error-message" id="reason-error">Пожалуйста, укажите обоснование (минимум 10 символов)</div>
             </div>
-            
-            <!--<button type="submit" class="submit-btn">Отправить заявку</button>-->
         </form>
     </div>
-
+    
     <script>
         // Инициализация Telegram Web App
         const tg = window.Telegram.WebApp;
         tg.ready();
+        tg.expand();
         
         // Применение темы Telegram
         document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
         document.body.style.color = tg.themeParams.text_color || '#000000';
         
-        // Обработка формы
-        document.getElementById('advanceForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Получаем элементы формы
+        const form = document.getElementById('advanceForm');
+        const amountInput = document.getElementById('amount');
+        const reasonInput = document.getElementById('reason');
+        const amountError = document.getElementById('amount-error');
+        const reasonError = document.getElementById('reason-error');
+        
+        // Функция для проверки валидности формы
+        function validateForm() {
+            const amount = amountInput.value.trim();
+            const reason = reasonInput.value.trim();
             
-            const formData = new FormData(this);
+            let isValid = true;
+            
+            // Валидация суммы
+            if (!amount || amount < 0) {
+                amountError.style.display = 'block';
+                amountInput.style.borderColor = '#ff4444';
+                isValid = false;
+            } else {
+                amountError.style.display = 'none';
+                amountInput.style.borderColor = '#00aa00';
+            }
+            
+            // Валидация обоснования
+            if (!reason || reason.length < 10) {
+                reasonError.style.display = 'block';
+                reasonInput.style.borderColor = '#ff4444';
+                isValid = false;
+            } else {
+                reasonError.style.display = 'none';
+                reasonInput.style.borderColor = '#00aa00';
+            }
+            
+            return isValid;
+        }
+        
+        // Функция для обновления состояния главной кнопки
+        function updateMainButton() {
+            const isFormValid = validateForm();
+            
+            if (isFormValid) {
+                tg.MainButton.enable();
+                tg.MainButton.setParams({
+                    color: tg.themeParams.button_color || '#0088cc',
+                    text_color: tg.themeParams.button_text_color || '#ffffff'
+                });
+            } else {
+                tg.MainButton.disable();
+                tg.MainButton.setParams({
+                    color: '#cccccc',
+                    text_color: '#666666'
+                });
+            }
+        }
+        
+        // Добавляем обработчики событий для полей ввода
+        amountInput.addEventListener('input', updateMainButton);
+        amountInput.addEventListener('blur', updateMainButton);
+        reasonInput.addEventListener('input', updateMainButton);
+        reasonInput.addEventListener('blur', updateMainButton);
+        
+        // Предотвращаем отправку формы через HTML
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            return false;
+        });
+        
+        // Настройка главной кнопки Telegram
+        tg.MainButton.text = "ОТПРАВИТЬ ДАННЫЕ";
+        tg.MainButton.show();
+        
+        // Изначально кнопка отключена
+        updateMainButton();
+        
+        // Обработчик клика по главной кнопке
+        tg.MainButton.onClick(function() {
+            if (!validateForm()) {
+                // Дополнительная проверка на случай, если что-то пошло не так
+                return;
+            }
+            
+            const formData = new FormData(form);
             const amount = formData.get('amount');
             const reason = formData.get('reason');
             
@@ -95,31 +191,31 @@
                 user: tg.initDataUnsafe?.user
             };
             
-            // Отправка данных боту
-            tg.sendData(JSON.stringify(data));
+            // Показываем индикатор загрузки
+            tg.MainButton.showProgress();
             
-            // Закрытие Web App
-            tg.close();
+            try {
+                // Отправка данных боту
+                tg.sendData(JSON.stringify(data));
+                
+                // Закрытие Web App
+                tg.close();
+            } catch (error) {
+                // Скрываем индикатор загрузки в случае ошибки
+                tg.MainButton.hideProgress();
+                console.error('Ошибка при отправке данных:', error);
+            }
         });
         
-        // Показать главную кнопку (опционально)
-        tg.MainButton.text = "ОТПРАВИТЬ ДАННЫЕ";
-        tg.MainButton.show();
-        
-        tg.MainButton.onClick(function() {
-            document.getElementById('advanceForm').dispatchEvent(new Event('submit'));
+        // Обработка изменения темы
+        tg.onEvent('themeChanged', function() {
+            document.body.style.backgroundColor = tg.themeParams.bg_color;
+            document.body.style.color = tg.themeParams.text_color;
+            updateMainButton();
         });
+        
+        // Дополнительная проверка при фокусе на окно
+        window.addEventListener('focus', updateMainButton);
     </script>
 </body>
-
 </html>
-
-
-
-
-
-
-
-
-
-
