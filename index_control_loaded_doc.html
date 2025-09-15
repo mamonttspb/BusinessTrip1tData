@@ -31,7 +31,6 @@
   <script>
     const WebApp = window.Telegram.WebApp;
     WebApp.ready();
-
     // Прочитать JSON из start_param или URL
     const params = new URLSearchParams(window.location.search);
     const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
@@ -42,13 +41,32 @@
       console.error('Невалидный JSON', e);
     }
 
-    // Преобразование даты YYYY-MM-DD → DD.MM.YYYY
-    function formatDate(d) {
-      if (!d) return '';
-      const [y, m, day] = d.split('-');
-      return `${day}.${m}.${y}`;
+    // --- ВСТАВИТЬ ЗДЕСЬ ---
+    // Функция для приведения чисел к формату "2400.00"
+    function normalizeNum(str) {
+      if (typeof str !== 'string') return str;
+      return str
+        .replace(/\s/g, '')   // убрать пробелы
+        .replace(',', '.');   // заменить запятую на точку
     }
+    // Нормализуем cost_category
+    if (Array.isArray(data.cost_category)) {
+      data.cost_category = data.cost_category.map(obj => {
+        const [desc, val] = Object.entries(obj)[0];
+        return { [desc]: normalizeNum(val) };
+      });
+    }
+    // Нормализуем total
+    if (data['total, RUB'] !== undefined) {
+      data['total, RUB'] = normalizeNum(data['total, RUB']);
+    }
+    if (data.total !== undefined) {
+      data.total = normalizeNum(data.total);
+    }
+    // --- КОНЕЦ ВСТАВКИ ---
 
+    // Преобразование даты YYYY-MM-DD → DD.MM.YYYY
+    function formatDate(d) { /* … */ }
     const form = document.getElementById('docForm');
     const errorDiv = document.getElementById('error');
 
@@ -176,4 +194,5 @@
     };
   </script>
 </body>
+
 </html>
