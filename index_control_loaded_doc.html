@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
@@ -32,206 +32,144 @@
     const WebApp = window.Telegram.WebApp;
     WebApp.ready();
 
-    // Прочитать JSON из start_param или URL
+    // Прочитать JSON
     const params = new URLSearchParams(window.location.search);
-    const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
+    const raw = WebApp.initDataUnsafe?.start_param || params.get('data') || '{}';
     let data = {};
     try {
-      data = JSON.parse(decodeURIComponent(startParam || '{}'));
-    } catch (e) {
-      console.error('Невалидный JSON', e);
+      data = JSON.parse(decodeURIComponent(raw));
+    } catch(e) {
+      console.error('JSON parse error', e);
     }
 
-    // --- Нормализация чисел ---
+    // Normalize numbers
     function normalizeNum(str) {
       if (typeof str !== 'string') return str;
-      return str.replace(/\s/g, '').replace(',', '.');
+      return str.replace(/\s/g,'').replace(',', '.');
     }
     if (Array.isArray(data.cost_category)) {
-      data.cost_category = data.cost_category.map(obj => {
-        const [desc, val] = Object.entries(obj)[0];
-        return { [desc]: normalizeNum(val) };
+      data.cost_category = data.cost_category.map(item => {
+        const key = Object.keys(item)[0];
+        return {[key]: normalizeNum(item[key])};
       });
     }
-    // unify total into data.total
+    // unify total
     if (data['total, RUB'] !== undefined) {
       data.total = normalizeNum(data['total, RUB']);
-    } else if (data.total !== undefined) {
-      data.total = normalizeNum(data.total);
     } else {
-      data.total = '';
+      data.total = data.total?normalizeNum(data.total):'';
     }
-    // --- Конец нормализации ---
 
-    // Преобразование даты YYYY-MM-DD → DD.MM.YYYY
+    // format date
     function formatDate(d) {
-      if (!d) return '';
-      const [y, m, day] = d.split('-');
+      if(!d) return '';
+      const [y,m,day]=d.split('-');
       return `${day}.${m}.${y}`;
     }
 
     const form = document.getElementById('docForm');
-    const errorDiv = document.getElementById('error');
+    const err = document.getElementById('error');
+    if (data.error) err.textContent = `ВНИМАНИЕ: ${data.error}`;
 
-    // Показать error если есть
-    if (data.error) {
-      errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
+    function addField(label,value='',name,type='text') {
+      const c=document.createElement('div'); c.className='field';
+      const l=document.createElement('label'); l.textContent=label;
+      const i=document.createElement('input');
+      i.type=type; i.name=name; i.value=value;
+      if(name==='total'){ i.id='totalInput'; i.readOnly=true; }
+      c.append(l,i); form.append(c);
     }
 
-    // Общая функция рендеринга поля
-    function addField(labelText, value = '', name, type = 'text') {
-      const container = document.createElement('div');
-      container.className = 'field';
-      const label = document.createElement('label');
-      label.textContent = labelText;
-      const input = document.createElement('input');
-      input.type = type;
-      input.name = name;
-      input.value = value;
-      if (name === 'total') {
-        input.id = 'totalInput';
-        input.readOnly = true;
-      }
-      container.append(label, input);
-      form.append(container);
-    }
+    function renderCosts(costs){
+      const c=document.createElement('div'); c.className='field';
+      const l=document.createElement('label'); l.textContent='Затраты';
+      c.append(l); form.append(c);
 
-    // Рендер списка затрат с динамическим пересчетом total
-    function renderCosts(costs) {
-      const container = document.createElement('div');
-      container.className = 'field';
-      const label = document.createElement('label');
-      label.textContent = 'Затраты';
-      container.append(label);
-      form.append(container);
-
-      function updateDeleteButtons() {
-        const rows = container.querySelectorAll('.cost-row');
-        rows.forEach(row => {
-          const delBtn = row.querySelector('.del-btn');
-          delBtn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+      function updDel(){
+        const rows=c.querySelectorAll('.cost-row');
+        rows.forEach(r=>{
+          r.querySelector('.del-btn').style.visibility=rows.length>1?'visible':'hidden';
         });
       }
-
-      function calculateTotal() {
-        const sums = Array.from(container.querySelectorAll('input[name="cost_sum"]'))
-          .map(i => parseFloat(i.value) || 0);
-        const total = sums.reduce((a, b) => a + b, 0).toFixed(2);
-        document.getElementById('totalInput').value = total;
+      function calc(){
+        const s=Array.from(c.querySelectorAll('input[name="cost_sum"]'))
+          .reduce((sum,i)=>sum+(parseFloat(i.value)||0),0).toFixed(2);
+        document.getElementById('totalInput').value=s;
       }
-
-      function addCostRow(desc = '', sum = '') {
-        const row = document.createElement('div');
-        row.className = 'cost-row';
-
-        const descInput = document.createElement('input');
-        descInput.type = 'text';
-        descInput.placeholder = 'Описание';
-        descInput.value = desc;
-        descInput.name = 'cost_desc';
-
-        const sumInput = document.createElement('input');
-        sumInput.type = 'number';
-        sumInput.step = '0.01';
-        sumInput.placeholder = 'Сумма';
-        sumInput.value = sum;
-        sumInput.name = 'cost_sum';
-        sumInput.oninput = calculateTotal;
-
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.textContent = '➕';
-        addBtn.title = 'Добавить строку ниже';
-        addBtn.onclick = () => {
-          addCostRow();
-          updateDeleteButtons();
+      function addRow(desc='',sum=''){
+        const r=document.createElement('div'); r.className='cost-row';
+        const di=document.createElement('input');
+        di.type='text'; di.name='cost_desc'; di.placeholder='Описание'; di.value=desc;
+        const si=document.createElement('input');
+        si.type='number'; si.name='cost_sum'; si.step='0.01'; si.placeholder='Сумма'; si.value=sum;
+        si.oninput=calc;
+        const ab=document.createElement('button');
+        ab.type='button'; ab.textContent='➕'; ab.onclick=()=>{
+          addRow(); updDel();
         };
-
-        const delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.textContent = '➖';
-        delBtn.title = 'Удалить текущую строку';
-        delBtn.className = 'del-btn';
-        delBtn.onclick = () => {
-          row.remove();
-          updateDeleteButtons();
-          calculateTotal();
-        };
-
-        row.append(descInput, sumInput, addBtn, delBtn);
-        container.append(row);
-        updateDeleteButtons();
-        calculateTotal();
+        const db=document.createElement('button');
+        db.type='button'; db.textContent='➖'; db.className='del-btn';
+        db.onclick=()=>{ r.remove(); updDel(); calc(); };
+        r.append(di,si,ab,db);
+        c.append(r); updDel(); calc();
       }
-
-      if (Array.isArray(costs) && costs.length) {
-        costs.forEach(obj => {
-          const [desc, sum] = Object.entries(obj)[0];
-          addCostRow(desc, sum);
+      if(Array.isArray(costs)&&costs.length){
+        costs.forEach(it=>{
+          const k=Object.keys(it)[0];
+          addRow(k,it[k]);
         });
-      } else {
-        addCostRow();
-      }
+      } else addRow();
     }
 
-    // Универсальное добавление поля Итого
-    function addTotalField() {
-      addField('Итого', data.total, 'total', 'number');
-    }
+    // universal total
+    function addTotal(){ addField('Итого',data.total,'total','number'); }
 
-    // Основной рендер полей
-    switch (data.type_doc) {
+    // render
+    switch(data.type_doc){
       case 'cash_receipt':
-        addField('Тип документа', 'кассовый чек', 'type_doc');
-        addField('Дата покупки', formatDate(data.date_purchase), 'date_purchase', 'text');
+        addField('Тип документа','кассовый чек','type_doc');
+        addField('Дата покупки',formatDate(data.date_purchase),'date_purchase','text');
         renderCosts(data.cost_category);
-        addTotalField();
+        addTotal();
         break;
-
       case 'itinerary_receipt':
-        addField('Тип документа', 'маршрутная квитанция', 'type_doc');
-        addField('Населенный пункт убытия', data.departure_city, 'departure_city');
-        addField('Дата убытия', formatDate(data.departure_date), 'departure_date', 'text');
-        addField('Населенный пункт прибытия', data.arrival_city, 'arrival_city');
-        addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date', 'text');
+        addField('Тип документа','маршрутная квитанция','type_doc');
+        addField('Населенный пункт убытия',data.departure_city,'departure_city');
+        addField('Дата убытия',formatDate(data.departure_date),'departure_date','text');
+        addField('Населенный пункт прибытия',data.arrival_city,'arrival_city');
+        addField('Дата прибытия',formatDate(data.arrival_date),'arrival_date','text');
         renderCosts(data.cost_category);
-        addTotalField();
+        addTotal();
         break;
-
       case 'hotel_voucher':
-        addField('Тип документа', 'ваучер проживания в отеле', 'type_doc');
-        addField('Населенный пункт', data.city, 'city');
-        addField('Дата заселения', formatDate(data.check_in_day), 'check_in_day', 'text');
-        addField('Дата выезда', formatDate(data.check_out_date), 'check_out_date', 'text');
+        addField('Тип документа','ваучер проживания в отеле','type_doc');
+        addField('Населенный пункт',data.city,'city');
+        addField('Дата заселения',formatDate(data.check_in_day),'check_in_day','text');
+        addField('Дата выезда',formatDate(data.check_out_date),'check_out_date','text');
         break;
-
       default:
-        addField('Тип документа', data.type_doc === 'other' ? 'неизвестен' : data.type_doc, 'type_doc');
-        addField('Населенный пункт убытия', data.departure_city, 'departure_city');
-        addField('Дата убытия', formatDate(data.departure_date), 'departure_date', 'text');
-        addField('Населенный пункт прибытия', data.arrival_city, 'arrival_city');
-        addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date', 'text');
+        addField('Тип документа',data.type_doc==='other'?'неизвестен':data.type_doc,'type_doc');
+        addField('Населенный пункт убытия',data.departure_city,'departure_city');
+        addField('Дата убытия',formatDate(data.departure_date),'departure_date','text');
+        addField('Населенный пункт прибытия',data.arrival_city,'arrival_city');
+        addField('Дата прибытия',formatDate(data.arrival_date),'arrival_date','text');
         renderCosts(data.cost_category);
-        addTotalField();
-        break;
+        addTotal();
     }
 
-    // Обработчики кнопок
-    document.getElementById('saveBtn').onclick = () => {
-      const formData = {};
-      new FormData(form).forEach((v, k) => {
-        if (k === 'cost_desc' || k === 'cost_sum') {
-          formData.costs = formData.costs || [];
-          if (k === 'cost_desc') formData.costs.push({ desc: v });
-          else formData.costs[formData.costs.length - 1].sum = v;
-        } else {
-          formData[k] = v;
-        }
+    // buttons
+    document.getElementById('saveBtn').onclick=()=>{
+      const out={}; new FormData(form).forEach((v,k)=>{
+        if(k==='cost_desc'||k==='cost_sum'){
+          out.costs=out.costs||[];
+          if(k==='cost_desc') out.costs.push({desc:v});
+          else out.costs[out.costs.length-1].sum=v;
+        } else out[k]=v;
       });
-      WebApp.sendData(JSON.stringify({ action: 'save', data: formData }));
+      WebApp.sendData(JSON.stringify({action:'save',data:out}));
     };
-    document.getElementById('cancelBtn').onclick = () => {
-      WebApp.sendData(JSON.stringify({ action: 'cancel' }));
+    document.getElementById('cancelBtn').onclick=()=>{
+      WebApp.sendData(JSON.stringify({action:'cancel'}));
       WebApp.close();
     };
   </script>
