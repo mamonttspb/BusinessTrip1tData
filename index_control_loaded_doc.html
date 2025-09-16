@@ -1,177 +1,360 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 10px; }
-    .field { margin-bottom: 10px; }
-    .field label { display: block; margin-bottom: 4px; font-weight: bold; }
-    .field input[type="text"], .field input[type="number"], .field input[type="date"] {
-      width: 100%; padding: 6px; box-sizing: border-box;
-    }
-    .cost-row { display: flex; align-items: center; margin-bottom: 6px; }
-    .cost-row input { margin-right: 4px; }
-    .cost-row button { background: none; border: none; font-size: 18px; cursor: pointer; margin-left: 4px; }
-    .del-btn { visibility: hidden; }
-    #buttons { margin-top: 20px; display: flex; justify-content: space-between; }
-    #buttons button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-    #error { color: red; font-weight: bold; margin-bottom: 10px; }
-  </style>
-  <title>Данные документа</title>
-</head>
-<body>
-  <div id="error"></div>
-  <form id="docForm"></form>
-  <div id="buttons">
-    <button type="button" id="saveBtn">✅ Сохранить данные</button>
-    <button type="button" id="cancelBtn">❌ Отменить загрузку данных</button>
-  </div>
-  <script>
-    const WebApp = window.Telegram.WebApp;
-    WebApp.ready();
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 10px;
+      }
+      .field {
+        margin-bottom: 10px;
+      }
+      .field label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: bold;
+      }
+      .field input[type="text"],
+      .field input[type="number"],
+      .field input[type="date"] {
+        width: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+      }
+      .cost-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .cost-row input {
+        margin-right: 4px;
+      }
+      .cost-row button {
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        margin-left: 4px;
+      }
+      .del-btn {
+        visibility: hidden;
+      }
+      #buttons {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+      }
+      #buttons button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      #error {
+        color: red;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+    </style>
+    <title>Данные документа</title>
+  </head>
+  <body>
+    <div id="error"></div>
+    <form id="docForm"></form>
+    <div id="buttons">
+      <button type="button" id="saveBtn">✅ Сохранить данные</button>
+      <button type="button" id="cancelBtn">❌ Отменить загрузку данных</button>
+    </div>
 
-    // Прочитать JSON
-    const params = new URLSearchParams(window.location.search);
-    const raw = WebApp.initDataUnsafe?.start_param || params.get('data') || '{}';
-    let data = {};
-    try {
-      data = JSON.parse(decodeURIComponent(raw));
-    } catch(e) {
-      console.error('JSON parse error', e);
-    }
+    <script>
+      const WebApp = window.Telegram.WebApp;
+      WebApp.ready();
 
-    // Normalize numbers
-    function normalizeNum(str) {
-      if (typeof str !== 'string') return str;
-      return str.replace(/\s/g,'').replace(',', '.');
-    }
-    if (Array.isArray(data.cost_category)) {
-      data.cost_category = data.cost_category.map(item => {
-        const key = Object.keys(item)[0];
-        return {[key]: normalizeNum(item[key])};
-      });
-    }
-    // unify total
-    if (data['total, RUB'] !== undefined) {
-      data.total = normalizeNum(data['total, RUB']);
-    } else {
-      data.total = data.total?normalizeNum(data.total):'';
-    }
+      // 1) Парсинг входных данных (initDataUnsafe.start_param или ?data=)
+      const params = new URLSearchParams(window.location.search);
+      const startParam =
+        WebApp.initDataUnsafe?.start_param || params.get("data");
+      let data = {};
+      try {
+        data = JSON.parse(decodeURIComponent(startParam || "{}"));
+      } catch (e) {
+        console.error("Невалидный JSON", e);
+        data = {};
+      }
 
-    // format date
-    function formatDate(d) {
-      if(!d) return '';
-      const [y,m,day]=d.split('-');
-      return `${day}.${m}.${y}`;
-    }
+      // 2) Утилиты
+      // Нормализация числа: "2 400,00" -> "2400.00"
+      function normalizeNum(str) {
+        if (str == null) return "";
+        return String(str).replace(/\s/g, "").replace(",", ".");
+      }
 
-    const form = document.getElementById('docForm');
-    const err = document.getElementById('error');
-    if (data.error) err.textContent = `ВНИМАНИЕ: ${data.error}`;
+      // Формат даты YYYY-MM-DD -> DD.MM.YYYY
+      function formatDate(d) {
+        if (!d) return "";
+        if (/\d{2}\.\d{2}\.\d{4}/.test(d)) return d;
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+        if (!m) return d;
+        const [, y, mm, dd] = m;
+        return `${dd}.${mm}.${y}`;
+      }
 
-    function addField(label,value='',name,type='text') {
-      const c=document.createElement('div'); c.className='field';
-      const l=document.createElement('label'); l.textContent=label;
-      const i=document.createElement('input');
-      i.type=type; i.name=name; i.value=value;
-      if(name==='total'){ i.id='totalInput'; i.readOnly=true; }
-      c.append(l,i); form.append(c);
-    }
-
-    function renderCosts(costs){
-      const c=document.createElement('div'); c.className='field';
-      const l=document.createElement('label'); l.textContent='Затраты';
-      c.append(l); form.append(c);
-
-      function updDel(){
-        const rows=c.querySelectorAll('.cost-row');
-        rows.forEach(r=>{
-          r.querySelector('.del-btn').style.visibility=rows.length>1?'visible':'hidden';
+      // 3) Нормализация входного JSON
+      if (Array.isArray(data.cost_category)) {
+        data.cost_category = data.cost_category.map((obj) => {
+          const [desc, val] = Object.entries(obj)[0] || ["", ""];
+          return { [desc]: normalizeNum(val) };
         });
       }
-      function calc(){
-        const s=Array.from(c.querySelectorAll('input[name="cost_sum"]'))
-          .reduce((sum,i)=>sum+(parseFloat(i.value)||0),0).toFixed(2);
-        document.getElementById('totalInput').value=s;
+
+      // Унифицируем total в data.total
+      if (data["total, RUB"] != null && data["total, RUB"] !== "") {
+        data.total = normalizeNum(data["total, RUB"]);
+      } else if (data["total, руб"] != null && data["total, руб"] !== "") {
+        data.total = normalizeNum(data["total, руб"]);
+      } else if (data.total != null && data.total !== "") {
+        data.total = normalizeNum(data.total);
+      } else {
+        data.total = "";
       }
-      function addRow(desc='',sum=''){
-        const r=document.createElement('div'); r.className='cost-row';
-        const di=document.createElement('input');
-        di.type='text'; di.name='cost_desc'; di.placeholder='Описание'; di.value=desc;
-        const si=document.createElement('input');
-        si.type='number'; si.name='cost_sum'; si.step='0.01'; si.placeholder='Сумма'; si.value=sum;
-        si.oninput=calc;
-        const ab=document.createElement('button');
-        ab.type='button'; ab.textContent='➕'; ab.onclick=()=>{
-          addRow(); updDel();
-        };
-        const db=document.createElement('button');
-        db.type='button'; db.textContent='➖'; db.className='del-btn';
-        db.onclick=()=>{ r.remove(); updDel(); calc(); };
-        r.append(di,si,ab,db);
-        c.append(r); updDel(); calc();
+
+      const form = document.getElementById("docForm");
+      const errorDiv = document.getElementById("error");
+
+      if (data.error) {
+        errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
       }
-      if(Array.isArray(costs)&&costs.length){
-        costs.forEach(it=>{
-          const k=Object.keys(it)[0];
-          addRow(k,it[k]);
+
+      // 4) Рендер вспомогательных полей
+      function addField(labelText, value = "", name, type = "text") {
+        const container = document.createElement("div");
+        container.className = "field";
+
+        const label = document.createElement("label");
+        label.textContent = labelText;
+
+        const input = document.createElement("input");
+        input.type = type;
+        input.name = name;
+        input.value = value;
+
+        if (name === "total") {
+          input.id = "totalInput";
+          input.readOnly = true;
+        }
+
+        container.append(label, input);
+        form.append(container);
+        return input;
+      }
+
+      // Глобальный пересчет Итого
+      function computeAndFillTotal() {
+        const sums = Array.from(
+          document.querySelectorAll('input[name="cost_sum"]')
+        ).map((i) => parseFloat(i.value) || 0);
+        const total = sums.reduce((a, b) => a + b, 0).toFixed(2);
+        const totalEl = document.getElementById("totalInput");
+        if (totalEl) {
+          totalEl.value = total;
+        }
+        return total;
+      }
+
+      // 5) Рендер списка затрат
+      function renderCosts(costs) {
+        const container = document.createElement("div");
+        container.className = "field";
+
+        const label = document.createElement("label");
+        label.textContent = "Затраты";
+
+        container.append(label);
+        form.append(container);
+
+        function updateDeleteButtons() {
+          const rows = container.querySelectorAll(".cost-row");
+          rows.forEach((row) => {
+            const delBtn = row.querySelector(".del-btn");
+            delBtn.style.visibility = rows.length > 1 ? "visible" : "hidden";
+          });
+        }
+
+        function addCostRow(desc = "", sum = "") {
+          const row = document.createElement("div");
+          row.className = "cost-row";
+
+          const descInput = document.createElement("input");
+          descInput.type = "text";
+          descInput.placeholder = "Описание";
+          descInput.value = desc;
+          descInput.name = "cost_desc";
+
+          const sumInput = document.createElement("input");
+          sumInput.type = "number";
+          sumInput.step = "0.01";
+          sumInput.placeholder = "Сумма";
+          sumInput.value = sum;
+          sumInput.name = "cost_sum";
+          sumInput.oninput = computeAndFillTotal;
+
+          const addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.textContent = "➕";
+          addBtn.title = "Добавить строку ниже";
+          addBtn.onclick = () => {
+            addCostRow();
+            updateDeleteButtons();
+            computeAndFillTotal();
+          };
+
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.textContent = "➖";
+          delBtn.title = "Удалить текущую строку";
+          delBtn.className = "del-btn";
+          delBtn.onclick = () => {
+            row.remove();
+            updateDeleteButtons();
+            computeAndFillTotal();
+          };
+
+          row.append(descInput, sumInput, addBtn, delBtn);
+          container.append(row);
+          updateDeleteButtons();
+        }
+
+        if (Array.isArray(costs) && costs.length) {
+          costs.forEach((obj) => {
+            const [desc, sum] = Object.entries(obj)[0] || ["", ""];
+            addCostRow(desc, sum);
+          });
+        } else {
+          addCostRow();
+        }
+
+        // Первый расчет
+        computeAndFillTotal();
+      }
+
+      // 6) Рендер по типу документа
+      switch (data.type_doc) {
+        case "cash_receipt":
+          addField("Тип документа", "кассовый чек", "type_doc");
+          addField(
+            "Дата покупки",
+            formatDate(data.date_purchase),
+            "date_purchase",
+            "text"
+          );
+          renderCosts(data.cost_category);
+          addField("Итого", data.total, "total", "number");
+          if (!data.total) computeAndFillTotal();
+          break;
+
+        case "itinerary_receipt":
+          addField("Тип документа", "маршрутная квитанция", "type_doc");
+          addField(
+            "Населенный пункт убытия",
+            data.departure_city || "",
+            "departure_city"
+          );
+          addField(
+            "Дата убытия",
+            formatDate(data.departure_date || ""),
+            "departure_date",
+            "text"
+          );
+          addField(
+            "Населенный пункт прибытия",
+            data.arrival_city || "",
+            "arrival_city"
+          );
+          addField(
+            "Дата прибытия",
+            formatDate(data.arrival_date || ""),
+            "arrival_date",
+            "text"
+          );
+          renderCosts(data.cost_category);
+          addField("Итого", data.total, "total", "number");
+          if (!data.total) computeAndFillTotal();
+          break;
+
+        case "hotel_voucher":
+          addField("Тип документа", "ваучер проживания в отеле", "type_doc");
+          addField("Населенный пункт", data.city || "", "city");
+          addField(
+            "Дата заселения",
+            formatDate(data.check_in_day || ""),
+            "check_in_day",
+            "text"
+          );
+          addField(
+            "Дата выезда",
+            formatDate(data.check_out_date || ""),
+            "check_out_date",
+            "text"
+          );
+          break;
+
+        default:
+          addField(
+            "Тип документа",
+            data.type_doc === "other" ? "неизвестен" : data.type_doc || "",
+            "type_doc"
+          );
+          addField(
+            "Населенный пункт убытия",
+            data.departure_city || "",
+            "departure_city"
+          );
+          addField(
+            "Дата убытия",
+            formatDate(data.departure_date || ""),
+            "departure_date",
+            "text"
+          );
+          addField(
+            "Населенный пункт прибытия",
+            data.arrival_city || "",
+            "arrival_city"
+          );
+          addField(
+            "Дата прибытия",
+            formatDate(data.arrival_date || ""),
+            "arrival_date",
+            "text"
+          );
+          renderCosts(data.cost_category);
+          addField("Итого", data.total, "total", "number");
+          if (!data.total) computeAndFillTotal();
+          break;
+      }
+
+      // 7) Кнопки
+      document.getElementById("saveBtn").onclick = () => {
+        const formData = {};
+        new FormData(form).forEach((v, k) => {
+          if (k === "cost_desc" || k === "cost_sum") {
+            formData.costs = formData.costs || [];
+            if (k === "cost_desc") formData.costs.push({ desc: v });
+            else formData.costs[formData.costs.length - 1].sum = v;
+          } else {
+            formData[k] = v;
+          }
         });
-      } else addRow();
-    }
+        formData.total =
+          document.getElementById("totalInput")?.value || formData.total || "";
+        WebApp.sendData(JSON.stringify({ action: "save", data: formData }));
+      };
 
-    // universal total
-    function addTotal(){ addField('Итого',data.total,'total','number'); }
-
-    // render
-    switch(data.type_doc){
-      case 'cash_receipt':
-        addField('Тип документа','кассовый чек','type_doc');
-        addField('Дата покупки',formatDate(data.date_purchase),'date_purchase','text');
-        renderCosts(data.cost_category);
-        addTotal();
-        break;
-      case 'itinerary_receipt':
-        addField('Тип документа','маршрутная квитанция','type_doc');
-        addField('Населенный пункт убытия',data.departure_city,'departure_city');
-        addField('Дата убытия',formatDate(data.departure_date),'departure_date','text');
-        addField('Населенный пункт прибытия',data.arrival_city,'arrival_city');
-        addField('Дата прибытия',formatDate(data.arrival_date),'arrival_date','text');
-        renderCosts(data.cost_category);
-        addTotal();
-        break;
-      case 'hotel_voucher':
-        addField('Тип документа','ваучер проживания в отеле','type_doc');
-        addField('Населенный пункт',data.city,'city');
-        addField('Дата заселения',formatDate(data.check_in_day),'check_in_day','text');
-        addField('Дата выезда',formatDate(data.check_out_date),'check_out_date','text');
-        break;
-      default:
-        addField('Тип документа',data.type_doc==='other'?'неизвестен':data.type_doc,'type_doc');
-        addField('Населенный пункт убытия',data.departure_city,'departure_city');
-        addField('Дата убытия',formatDate(data.departure_date),'departure_date','text');
-        addField('Населенный пункт прибытия',data.arrival_city,'arrival_city');
-        addField('Дата прибытия',formatDate(data.arrival_date),'arrival_date','text');
-        renderCosts(data.cost_category);
-        addTotal();
-    }
-
-    // buttons
-    document.getElementById('saveBtn').onclick=()=>{
-      const out={}; new FormData(form).forEach((v,k)=>{
-        if(k==='cost_desc'||k==='cost_sum'){
-          out.costs=out.costs||[];
-          if(k==='cost_desc') out.costs.push({desc:v});
-          else out.costs[out.costs.length-1].sum=v;
-        } else out[k]=v;
-      });
-      WebApp.sendData(JSON.stringify({action:'save',data:out}));
-    };
-    document.getElementById('cancelBtn').onclick=()=>{
-      WebApp.sendData(JSON.stringify({action:'cancel'}));
-      WebApp.close();
-    };
-  </script>
-</body>
+      document.getElementById("cancelBtn").onclick = () => {
+        WebApp.sendData(JSON.stringify({ action: "cancel" }));
+        WebApp.close();
+      };
+    </script>
+  </body>
 </html>
