@@ -32,7 +32,7 @@
     const WebApp = window.Telegram.WebApp;
     WebApp.ready();
 
-    // Чтение JSON
+    // Прочитать JSON из start_param или URL
     const params = new URLSearchParams(window.location.search);
     const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
     let data = {};
@@ -42,7 +42,7 @@
       console.error('Невалидный JSON', e);
     }
 
-    // Normalize numbers
+    // --- Нормализация чисел ---
     function normalizeNum(str) {
       if (typeof str !== 'string') return str;
       return str.replace(/\s/g, '').replace(',', '.');
@@ -53,14 +53,17 @@
         return { [desc]: normalizeNum(val) };
       });
     }
+    // unify total into data.total
     if (data['total, RUB'] !== undefined) {
-      data['total, RUB'] = normalizeNum(data['total, RUB']);
-    }
-    if (data.total !== undefined) {
+      data.total = normalizeNum(data['total, RUB']);
+    } else if (data.total !== undefined) {
       data.total = normalizeNum(data.total);
+    } else {
+      data.total = '';
     }
+    // --- Конец нормализации ---
 
-    // Date format
+    // Преобразование даты YYYY-MM-DD → DD.MM.YYYY
     function formatDate(d) {
       if (!d) return '';
       const [y, m, day] = d.split('-');
@@ -70,10 +73,12 @@
     const form = document.getElementById('docForm');
     const errorDiv = document.getElementById('error');
 
+    // Показать error если есть
     if (data.error) {
       errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
     }
 
+    // Общая функция рендеринга поля
     function addField(labelText, value = '', name, type = 'text') {
       const container = document.createElement('div');
       container.className = 'field';
@@ -83,11 +88,15 @@
       input.type = type;
       input.name = name;
       input.value = value;
-      if (name === 'total') input.id = 'totalInput';
+      if (name === 'total') {
+        input.id = 'totalInput';
+        input.readOnly = true;
+      }
       container.append(label, input);
       form.append(container);
     }
 
+    // Рендер списка затрат с динамическим пересчетом total
     function renderCosts(costs) {
       const container = document.createElement('div');
       container.className = 'field';
@@ -105,7 +114,7 @@
       }
 
       function calculateTotal() {
-        const sums = [...container.querySelectorAll('input[name="cost_sum"]')]
+        const sums = Array.from(container.querySelectorAll('input[name="cost_sum"]'))
           .map(i => parseFloat(i.value) || 0);
         const total = sums.reduce((a, b) => a + b, 0).toFixed(2);
         document.getElementById('totalInput').value = total;
@@ -151,7 +160,6 @@
 
         row.append(descInput, sumInput, addBtn, delBtn);
         container.append(row);
-
         updateDeleteButtons();
         calculateTotal();
       }
@@ -166,14 +174,20 @@
       }
     }
 
-    // Render based on type_doc
+    // Универсальное добавление поля Итого
+    function addTotalField() {
+      addField('Итого', data.total, 'total', 'number');
+    }
+
+    // Основной рендер полей
     switch (data.type_doc) {
       case 'cash_receipt':
         addField('Тип документа', 'кассовый чек', 'type_doc');
         addField('Дата покупки', formatDate(data.date_purchase), 'date_purchase', 'text');
         renderCosts(data.cost_category);
-        addField('Итого', data['total, RUB'] || '', 'total', 'number');
+        addTotalField();
         break;
+
       case 'itinerary_receipt':
         addField('Тип документа', 'маршрутная квитанция', 'type_doc');
         addField('Населенный пункт убытия', data.departure_city, 'departure_city');
@@ -181,14 +195,16 @@
         addField('Населенный пункт прибытия', data.arrival_city, 'arrival_city');
         addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date', 'text');
         renderCosts(data.cost_category);
-        addField('Итого', data['total, RUB'] || '', 'total', 'number');
+        addTotalField();
         break;
+
       case 'hotel_voucher':
         addField('Тип документа', 'ваучер проживания в отеле', 'type_doc');
         addField('Населенный пункт', data.city, 'city');
         addField('Дата заселения', formatDate(data.check_in_day), 'check_in_day', 'text');
         addField('Дата выезда', formatDate(data.check_out_date), 'check_out_date', 'text');
         break;
+
       default:
         addField('Тип документа', data.type_doc === 'other' ? 'неизвестен' : data.type_doc, 'type_doc');
         addField('Населенный пункт убытия', data.departure_city, 'departure_city');
@@ -196,11 +212,11 @@
         addField('Населенный пункт прибытия', data.arrival_city, 'arrival_city');
         addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date', 'text');
         renderCosts(data.cost_category);
-        addField('Итого', data.total || '', 'total', 'number');
+        addTotalField();
         break;
     }
 
-    // Buttons
+    // Обработчики кнопок
     document.getElementById('saveBtn').onclick = () => {
       const formData = {};
       new FormData(form).forEach((v, k) => {
