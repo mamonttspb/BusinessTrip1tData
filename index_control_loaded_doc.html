@@ -309,6 +309,20 @@
           if (!data.total) computeAndFillTotal();
           break;
 
+        case 'boarding_pass':
+          addField('Тип документа', 'посадочный талон', 'type_doc');
+          addField(
+            'Населенный пункт убытия',
+            data.departure_city,
+            'departure_city'
+          );
+          addField(
+            'Населенный пункт прибытия',
+            data.arrival_city,
+            'arrival_city'
+          );
+          break;
+
         case 'hotel_voucher':
           addField('Тип документа', 'ваучер проживания в отеле', 'type_doc');
           addField('Населенный пункт', data.city, 'city');
@@ -390,4 +404,3 @@
     </script>
   </body>
 </html>
-
