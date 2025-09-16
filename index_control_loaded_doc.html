@@ -97,35 +97,59 @@
       label.textContent = 'Затраты';
       container.append(label);
       form.append(container);
-
-      function addCostRow(desc='', sum='') {
+  
+      function updateDeleteButtons() {
+        const rows = container.querySelectorAll('.cost-row');
+        rows.forEach(row => {
+          const delBtn = row.querySelector('.del-btn');
+          // Показываем кнопку удаления только если строк 2 и более
+          delBtn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+        });
+      }
+  
+      function addCostRow(desc = '', sum = '') {
         const row = document.createElement('div');
         row.className = 'cost-row';
+  
         const descInput = document.createElement('input');
         descInput.type = 'text';
         descInput.placeholder = 'Описание';
         descInput.value = desc;
         descInput.name = 'cost_desc';
+  
         const sumInput = document.createElement('input');
         sumInput.type = 'number';
         sumInput.step = '0.01';
         sumInput.placeholder = 'Сумма';
         sumInput.value = sum;
         sumInput.name = 'cost_sum';
+  
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.textContent = '➕';
         addBtn.title = 'Добавить строку ниже';
-        addBtn.onclick = () => addCostRow();
+        addBtn.onclick = () => {
+          addCostRow();
+          updateDeleteButtons();
+        };
+  
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.textContent = '➖';
         delBtn.title = 'Удалить текущую строку';
-        delBtn.onclick = () => row.remove();
+        delBtn.className = 'del-btn';
+        delBtn.onclick = () => {
+          row.remove();
+          updateDeleteButtons();
+        };
+  
         row.append(descInput, sumInput, addBtn, delBtn);
         container.append(row);
+  
+        // Обновляем видимость после добавления
+        updateDeleteButtons();
       }
-
+  
       if (Array.isArray(costs) && costs.length) {
         costs.forEach(obj => {
           const [desc, sum] = Object.entries(obj)[0];
@@ -196,3 +220,4 @@
 </body>
 
 </html>
+
