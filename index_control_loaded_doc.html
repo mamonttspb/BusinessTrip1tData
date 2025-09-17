@@ -387,11 +387,11 @@
         });
         formData.total =
           document.getElementById('totalInput')?.value || formData.total || '';
-        WebApp.sendData(JSON.stringify({ action: 'save', data: formData }));
+        WebApp.sendData(JSON.stringify({ action: 'save_approval_doc', data: formData }));
       };
 
       document.getElementById('cancelBtn').onclick = () => {
-        WebApp.sendData(JSON.stringify({ action: 'cancel' }));
+        WebApp.sendData(JSON.stringify({ action: 'cancel_approval_doc' }));
         WebApp.close();
       };
 
@@ -404,4 +404,5 @@
     </script>
   </body>
 </html>
+
 
