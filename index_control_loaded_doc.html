@@ -12,6 +12,17 @@
         background: var(--tg-theme-bg-color);
         color: var(--tg-theme-text-color);
       }
+      
+      .form-title {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 20px;
+        color: var(--tg-theme-text-color);
+        border-bottom: 2px solid var(--tg-theme-button-color, #0088cc);
+        padding-bottom: 10px;
+      }
+      
       .field {
         margin-bottom: 15px;
       }
@@ -96,6 +107,7 @@
   </head>
   <body>
     <div id="error"></div>
+    <h1 id="formTitle" class="form-title">Данные документа</h1>
     <form id="docForm"></form>
     <div id="buttons">
       <button type="button" id="saveBtn">✅ Подтвердить корректность данных</button>
@@ -122,6 +134,30 @@
       } catch {
         data = {};
       }
+
+      // Устанавливаем заголовок формы на основе real_name_file и page
+      function setFormTitle() {
+        const titleElement = document.getElementById('formTitle');
+        let title = 'Данные документа';
+        
+        if (data.real_name_file) {
+          // Убираем расширение файла если есть
+          const fileName = data.real_name_file.replace(/\.[^/.]+$/, '');
+          title = fileName;
+        }
+        
+        // Добавляем номер страницы если есть
+        if (data.page) {
+          title += `, стр. № ${data.page}`;
+        }
+        
+        titleElement.textContent = title;
+        // Также обновляем title страницы
+        document.title = title;
+      }
+
+      // Вызываем функцию установки заголовка
+      setFormTitle();
 
       function normalizeNum(str) {
         if (str == null) return '';
@@ -404,6 +440,3 @@
     </script>
   </body>
 </html>
-
-
-
