@@ -81,18 +81,30 @@
       #buttons {
         margin-top: 20px;
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
+        gap: 10px;
       }
       #buttons button {
-        width: 48%;
+        width: 100%;
         padding: 12px;
-        background: var(--tg-theme-button-color, #0088cc);
-        color: var(--tg-theme-button-text-color, #ffffff);
         border: none;
         border-radius: 6px;
         font-size: 16px;
         cursor: pointer;
         box-sizing: border-box;
+        font-weight: 500;
+      }
+      #saveBtn {
+        background: var(--tg-theme-button-color, #0088cc);
+        color: var(--tg-theme-button-text-color, #ffffff);
+      }
+      #skipBtn {
+        background: #ff9500;
+        color: #ffffff;
+      }
+      #cancelBtn {
+        background: #ff4444;
+        color: #ffffff;
       }
       #buttons button:active {
         opacity: 0.8;
@@ -111,6 +123,7 @@
     <form id="docForm"></form>
     <div id="buttons">
       <button type="button" id="saveBtn">✅ Подтвердить корректность данных</button>
+      <button type="button" id="skipBtn">☢ Не загружать текущий файл</button>
       <button type="button" id="cancelBtn">❌ Отменить загрузку данных</button>
     </div>
 
@@ -424,6 +437,10 @@
         formData.total =
           document.getElementById('totalInput')?.value || formData.total || '';
         WebApp.sendData(JSON.stringify({ action: 'save_approval_doc', data: formData }));
+      };
+
+      document.getElementById('skipBtn').onclick = () => {
+        WebApp.sendData(JSON.stringify({ action: 'skip_current_file' }));
       };
 
       document.getElementById('cancelBtn').onclick = () => {
