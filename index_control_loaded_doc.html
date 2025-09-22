@@ -360,6 +360,13 @@
           addField('Дата выезда', formatDate(data.departure_date), 'departure_date');
           break;
 
+        case 'boarding_pass':
+          addField('Тип документа', 'посадочный талон', 'type_doc');
+          addField('Населённый пункт отправления', data.departure_city, 'departure_city');
+          addField('Дата отправления', formatDate(data.departure_date), 'departure_date');
+          addField('Населённый пункт прибытия', data.arrival_city, 'arrival_city');
+          break;
+
         default:
           addField('Тип документа', 'неизвестен', 'type_doc');
           renderDynamicFields();
@@ -400,4 +407,3 @@
     </script>
   </body>
 </html>
-
