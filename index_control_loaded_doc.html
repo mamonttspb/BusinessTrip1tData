@@ -1,286 +1,196 @@
-<!DOCTYPE html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background: var(--tg-theme-bg-color);
-        color: var(--tg-theme-text-color);
-      }
-      .form-title {
-        font-size: 24px;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 20px;
-        color: var(--tg-theme-text-color);
-        border-bottom: 2px solid var(--tg-theme-button-color, #0088cc);
-        padding-bottom: 10px;
-      }
-      .field { margin-bottom: 15px; }
-      .field label {
-        display: block;
-        margin-bottom: 6px;
-        font-weight: 500;
-        font-size: 16px;
-      }
-      input, textarea {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid var(--tg-theme-button-color, #0088cc);
-        border-radius: 6px;
-        font-size: 16px;
-        box-sizing: border-box;
-        background: var(--tg-theme-secondary-bg-color);
-        color: var(--tg-theme-text-color);
-      }
-      textarea { height: 30vh; resize: vertical; }
-      .cost-row {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 8px;
-      }
-      .cost-row textarea,
-      .cost-row input { font-size: 14px; }
-      .cost-row button {
-        background: none;
-        border: none;
-        font-size: 20px;
-        cursor: pointer;
-        margin-left: 6px;
-        margin-top: 6px;
-        color: var(--tg-theme-button-color, #0088cc);
-      }
-      .del-btn { visibility: hidden; }
-      #buttons {
-        margin-top: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      #buttons button {
-        width: 100%;
-        padding: 12px;
-        border: none;
-        border-radius: 6px;
-        font-size: 16px;
-        cursor: pointer;
-        box-sizing: border-box;
-        font-weight: 500;
-      }
-      #saveBtn { background: var(--tg-theme-button-color, #0088cc); color: #fff; }
-      #skipBtn { background: #ff9500; color: #fff; }
-      #cancelBtn { background: #ff4444; color: #fff; }
-      #buttons button:active { opacity: 0.8; }
-      #error { color: #ff4444; font-size: 14px; margin-bottom: 10px; }
-    </style>
-    <title>Данные документа</title>
-  </head>
-  <body>
-    <div id="error"></div>
-    <h1 id="formTitle" class="form-title">Данные документа</h1>
-    <form id="docForm"></form>
-    <div id="buttons">
-      <button type="button" id="saveBtn">✅ Подтвердить корректность данных</button>
-      <button type="button" id="skipBtn">☢ Не загружать текущий файл</button>
-      <button type="button" id="cancelBtn">❌ Отменить загрузку данных</button>
-    </div>
+<script>
+  const WebApp = window.Telegram.WebApp;
+  WebApp.ready();
+  WebApp.expand();
 
-    <script>
-      const WebApp = window.Telegram.WebApp;
-      WebApp.ready();
-      WebApp.expand();
+  // Тема
+  document.body.style.backgroundColor = WebApp.themeParams.bg_color || '';
+  document.body.style.color = WebApp.themeParams.text_color || '';
 
-      // Тема
-      document.body.style.backgroundColor = WebApp.themeParams.bg_color || '';
-      document.body.style.color = WebApp.themeParams.text_color || '';
+  // Парсинг входных данных
+  const params = new URLSearchParams(window.location.search);
+  const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
+  let data = {};
+  try {
+    const rawData = JSON.parse(decodeURIComponent(startParam || '{}'));
+    let output = rawData.output;
+    if (typeof output === 'string') {
+      try { output = JSON.parse(output); } catch {}
+    }
+    data = {
+      ...(output || {}),
+      real_name_file: rawData.real_name_file,
+      page: rawData.page,
+    };
+  } catch {
+    data = {};
+  }
 
-      // Парсинг
-      const params = new URLSearchParams(window.location.search);
-      const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
-      let data = {};
-      try {
-        const rawData = JSON.parse(decodeURIComponent(startParam || '{}'));
+  // Заголовок формы
+  function setFormTitle() {
+    const el = document.getElementById('formTitle');
+    let title = 'Данные документа';
+    if (data.real_name_file) title = data.real_name_file.replace(/\.[^/.]+$/, '');
+    if (data.page) title += `, стр. № ${data.page}`;
+    el.textContent = title;
+    document.title = title;
+  }
+  setFormTitle();
 
-        // 1) если output — строка, пытаемся распарсить
-        let output = rawData.output;
-        if (typeof output === 'string') {
-          try {
-            output = JSON.parse(output);
-          } catch {}
-        }
+  // Хелперы
+  function normalizeNum(s) {
+    return s == null ? '' : String(s).replace(/\s/g, '').replace(',', '.');
+  }
+  function formatDate(d) {
+    if (!d) return '';
+    if (/\d{2}\.\d{2}\.\d{4}/.test(d)) return d;
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m}.${m}.${m}` : d;[1][2][3]
+  }
 
-        // 2) собираем итоговый объект
-        data = {
-          ...(output || {}),
-          real_name_file: rawData.real_name_file,
-          page: rawData.page,
-        };
-      } catch {
-        data = {};
-      }
+  // Подготовка значений
+  if (Array.isArray(data.cost_category)) {
+    data.cost_category = data.cost_category.map(o => {
+      const [k,v] = Object.entries(o) || ['', ''];
+      return { [k]: normalizeNum(v) };
+    });
+  }
+  data.total = normalizeNum(data['total, RUB'] || data['total, руб'] || data.total);
 
-      // Установка заголовка
-      function setFormTitle() {
-        const el = document.getElementById('formTitle');
-        let title = 'Данные документа';
-        if (data.real_name_file) {
-          title = data.real_name_file.replace(/\.[^/.]+$/, '');
-        }
-        if (data.page) {
-          title += `, стр. № ${data.page}`;
-        }
-        el.textContent = title;
-        document.title = title;
-      }
-      setFormTitle();
+  const form = document.getElementById('docForm');
+  const errorDiv = document.getElementById('error');
+  if (data.error) errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
 
-      // Вспомогательные
-      function normalizeNum(s) {
-        return s == null ? '' : String(s).replace(/\s/g, '').replace(',', '.');
-      }
-      function formatDate(d) {
-        if (!d) return '';
-        if (/\d{2}\.\d{2}\.\d{4}/.test(d)) return d;
-        const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        return m ? `${m[3]}.${m[2]}.${m[1]}` : d;
-      }
+  function addField(label, val='', name, type='text') {
+    const div = document.createElement('div');
+    div.className = 'field';
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    const input = (type==='textarea' ? document.createElement('textarea') : document.createElement('input'));
+    if (type!=='textarea') input.type = type;
+    input.name = name;
+    input.value = val;
+    div.append(lbl, input);
+    form.append(div);
+    return input;
+  }
 
-      // Подготовка cost_category и total
-      if (Array.isArray(data.cost_category)) {
-        data.cost_category = data.cost_category.map(o => {
-          const [k,v] = Object.entries(o)[0] || ['', ''];
-          return { [k]: normalizeNum(v) };
-        });
-      }
-      data.total = normalizeNum(
-        data['total, RUB'] || data['total, руб'] || data.total
-      );
+  function computeAndFillTotal() {
+    const sums = Array.from(document.querySelectorAll('input[name="cost_sum"]'))
+      .map(i => parseFloat(i.value) || 0);
+    const t = sums.reduce((a,b)=>a+b,0).toFixed(2);
+    const el = document.getElementById('totalInput');
+    if (el) el.value = t;
+  }
 
-      // Построение формы
-      const form = document.getElementById('docForm');
-      const errorDiv = document.getElementById('error');
-      if (data.error) errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
+  function renderCosts(costs) {
+    const c = document.createElement('div');
+    c.className = 'field';
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Затраты';
+    c.append(lbl);
+    form.append(c);
 
-      function addField(label, val='', name, type='text') {
-        const div = document.createElement('div');
-        div.className = 'field';
-        const lbl = document.createElement('label');
-        lbl.textContent = label;
-        const input = (type==='textarea' ? document.createElement('textarea') : document.createElement('input'));
-        if (type!=='textarea') input.type = type;
-        input.name = name;
-        input.value = val;
-        if (['date_purchase','departure_date','arrival_date','check_in_day','check_out_date'].includes(name)) {
-          input.type = 'date';
-          input.value = val ? val.split('.').reverse().join('-') : '';
-        }
-        if (name==='total') {
-          input.id = 'totalInput';
-          input.readOnly = true;
-        }
-        div.append(lbl, input);
-        form.append(div);
-        return input;
-      }
-
-      function computeAndFillTotal() {
-        const sums = Array.from(document.querySelectorAll('input[name="cost_sum"]'))
-          .map(i => parseFloat(i.value) || 0);
-        const t = sums.reduce((a,b)=>a+b,0).toFixed(2);
-        const el = document.getElementById('totalInput');
-        if (el) el.value = t;
-      }
-
-      function renderCosts(costs) {
-        const c = document.createElement('div');
-        c.className = 'field';
-        const lbl = document.createElement('label');
-        lbl.textContent = 'Затраты';
-        c.append(lbl);
-        form.append(c);
-
-        function updDel() {
-          const rows = c.querySelectorAll('.cost-row');
-          rows.forEach(r => {
-            r.querySelector('.del-btn').style.visibility = rows.length>1 ? 'visible' : 'hidden';
-          });
-        }
-
-        function addRow(desc='', sum='') {
-          const r = document.createElement('div');
-          r.className = 'cost-row';
-          const t = document.createElement('textarea');
-          t.name='cost_desc'; t.placeholder='Описание'; t.value=desc;
-          const num = document.createElement('input');
-          num.type='number'; num.step='0.01'; num.name='cost_sum'; num.value=sum;
-          num.oninput = computeAndFillTotal;
-          const plus = document.createElement('button');
-          plus.type='button'; plus.textContent='➕';
-          plus.onclick = ()=>{ addRow(); updDel(); computeAndFillTotal(); };
-          const del = document.createElement('button');
-          del.type='button'; del.textContent='➖'; del.className='del-btn';
-          del.onclick = ()=>{ r.remove(); updDel(); computeAndFillTotal(); };
-          r.append(t, num, plus, del);
-          c.append(r);
-          updDel();
-        }
-
-        if (Array.isArray(costs) && costs.length) {
-          costs.forEach(o=> {
-            const [d,s] = Object.entries(o)[0]||['',''];
-            addRow(d,s);
-          });
-        } else addRow();
-        computeAndFillTotal();
-      }
-
-      function addTotal() {
-        addField('Итого', data.total, 'total', 'number');
-      }
-
-      // В зависимости от type_doc
-      switch(data.type_doc) {
-        case 'cash_receipt':
-          addField('Тип документа','кассовый чек','type_doc');
-          addField('Дата покупки',data.date_purchase,'date_purchase','date');
-          renderCosts(data.cost_category);
-          addTotal();
-          break;
-        default:
-          addField('Тип документа', data.type_doc||'','type_doc');
-          renderCosts(data.cost_category);
-          addTotal();
-      }
-
-      // Кнопки
-      document.getElementById('saveBtn').onclick = ()=> {
-        const fd = {};
-        new FormData(form).forEach((v,k)=>{
-          if (k==='cost_desc'||k==='cost_sum') {
-            fd.costs = fd.costs||[];
-            if (k==='cost_desc') fd.costs.push({desc:v});
-            else fd.costs[fd.costs.length-1].sum=v;
-          } else fd[k]=v;
-        });
-        WebApp.sendData(JSON.stringify({action:'save_approval_doc',data:fd}));
-      };
-      document.getElementById('skipBtn').onclick = ()=> {
-        WebApp.sendData(JSON.stringify({action:'skip_current_file'}));
-      };
-      document.getElementById('cancelBtn').onclick = ()=> {
-        WebApp.sendData(JSON.stringify({action:'cancel_approval_doc'}));
-        WebApp.close();
-      };
-
-      WebApp.onEvent('themeChanged', ()=> {
-        document.body.style.backgroundColor = WebApp.themeParams.bg_color;
-        document.body.style.color = WebApp.themeParams.text_color;
+    function updDel() {
+      const rows = c.querySelectorAll('.cost-row');
+      rows.forEach(r => {
+        r.querySelector('.del-btn').style.visibility = rows.length>1 ? 'visible' : 'hidden';
       });
-    </script>
-  </body>
-</html>
+    }
+
+    function addRow(desc='', sum='') {
+      const r = document.createElement('div');
+      r.className = 'cost-row';
+      const t = document.createElement('textarea');
+      t.name='cost_desc'; t.placeholder='Описание'; t.value=desc;
+      const num = document.createElement('input');
+      num.type='number'; num.step='0.01'; num.name='cost_sum'; num.value=sum;
+      num.oninput = computeAndFillTotal;
+      const plus = document.createElement('button');
+      plus.type='button'; plus.textContent='➕';
+      plus.onclick = ()=>{ addRow(); updDel(); computeAndFillTotal(); };
+      const del = document.createElement('button');
+      del.type='button'; del.textContent='➖'; del.className='del-btn';
+      del.onclick = ()=>{ r.remove(); updDel(); computeAndFillTotal(); };
+      r.append(t, num, plus, del);
+      c.append(r);
+      updDel();
+    }
+
+    if (Array.isArray(costs) && costs.length) {
+      costs.forEach(o=> {
+        const [d,s] = Object.entries(o)||['',''];
+        addRow(d,s);
+      });
+    } else addRow();
+    computeAndFillTotal();
+  }
+
+  function addTotal() {
+    const input = addField('Итого', data.total, 'total', 'number');
+    input.id = 'totalInput';
+    input.readOnly = true;
+  }
+
+  // Рендер полей в зависимости от типа
+  switch (data.type_doc) {
+    case 'cash_receipt':
+      addField('Тип документа', 'кассовый чек', 'type_doc');
+      addField('Дата покупки', formatDate(data.date_purchase), 'date_purchase', 'text');
+      renderCosts(data.cost_category);
+      addTotal();
+      break;
+
+    case 'itinerary_receipt':
+      addField('Тип документа', 'маршрутная квитанция', 'type_doc');
+      addField('Населенный пункт убытия', data.departure_city, 'departure_city');
+      addField('Дата убытия', formatDate(data.departure_date), 'departure_date', 'text');
+      addField('Населенный пункт прибытия', data.arrival_city, 'arrival_city');
+      addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date', 'text');
+      renderCosts(data.cost_category);
+      addTotal();
+      break;
+
+    case 'hotel_voucher':
+      addField('Тип документа', 'ваучер проживания в отеле', 'type_doc');
+      addField('Населенный пункт', data.arrival_city, 'city');
+      addField('Дата заселения', formatDate(data.arrival_date), 'check_in_date', 'text');
+      addField('Дата выезда', formatDate(data.departure_date), 'check_out_date', 'text');
+      break;
+
+    default:
+      addField('Тип документа', data.type_doc === 'other' ? 'неизвестен' : (data.type_doc || ''), 'type_doc');
+      addField('Населенный пункт убытия', data.departure_city, 'departure_city');
+      addField('Дата убытия', formatDate(data.departure_date), 'departure_date', 'text');
+      addField('Населенный пункт прибытия', data.arrival_city, 'arrival_city');
+      addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date', 'text');
+      renderCosts(data.cost_category);
+      addTotal();
+      break;
+  }
+
+  // Кнопки
+  document.getElementById('saveBtn').onclick = ()=> {
+    const fd = {};
+    new FormData(form).forEach((v,k)=>{
+      if (k==='cost_desc'||k==='cost_sum') {
+        fd.costs = fd.costs||[];
+        if (k==='cost_desc') fd.costs.push({desc:v});
+        else fd.costs[fd.costs.length-1].sum=v;
+      } else fd[k]=v;
+    });
+    WebApp.sendData(JSON.stringify({action:'save_approval_doc',data:fd}));
+  };
+  document.getElementById('skipBtn').onclick = ()=> {
+    WebApp.sendData(JSON.stringify({action:'skip_current_file'}));
+  };
+  document.getElementById('cancelBtn').onclick = ()=> {
+    WebApp.sendData(JSON.stringify({action:'cancel_approval_doc'}));
+    WebApp.close();
+  };
+
+  WebApp.onEvent('themeChanged', ()=> {
+    document.body.style.backgroundColor = WebApp.themeParams.bg_color;
+    document.body.style.color = WebApp.themeParams.text_color;
+  });
+</script>
