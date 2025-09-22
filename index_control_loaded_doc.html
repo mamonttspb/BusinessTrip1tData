@@ -361,7 +361,7 @@
 
         case 'hotel_voucher':
           addField('Тип документа', 'ваучер проживания в отеле', 'type_doc');
-          addField('Населённый пункт', data.arrival_city, 'departure_city');
+          addField('Населённый пункт', data.arrival_city, 'arrival_city');
           addField('Дата заселения', formatDate(data.arrival_date), 'arrival_date');
           addField('Дата выезда', formatDate(data.departure_date), 'departure_date');
           break;
@@ -413,3 +413,4 @@
     </script>
   </body>
 </html>
+
