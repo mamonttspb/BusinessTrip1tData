@@ -118,6 +118,11 @@
         if (data.real_name_file) {
           title = data.real_name_file.replace(/\.[^/.]+$/, '');
         }
+         // ВСТАВИТЬ НАЧАЛО: проверка номера страницы
+        if (data.page && Number(data.page) > 0) {
+          title += `, стр. № ${data.page}`;
+        }
+        // ВСТАВИТЬ КОНЕЦ
         if (data.page) {
           title += `, стр. № ${data.page}`;
         }
@@ -295,3 +300,4 @@
     </script>
   </body>
 </html>
+
