@@ -198,15 +198,19 @@
         lbl.textContent = 'Затраты';
         c.append(lbl);
         form.append(c);
-
+      
         function updDel() {
           const rows = c.querySelectorAll('.cost-row');
           rows.forEach(r => {
-            r.querySelector('.del-btn').style.visibility =
-              rows.length > 1 ? 'visible' : 'hidden';
+            const delBtn = r.querySelector('.del-btn');
+            if (data.type_doc === 'other') {
+              delBtn.style.visibility = 'visible';
+            } else {
+              delBtn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+            }
           });
         }
-
+      
         function addRow(desc = '', sum = '') {
           const r = document.createElement('div');
           r.className = 'cost-row';
@@ -241,7 +245,7 @@
           c.append(r);
           updDel();
         }
-
+      
         if (Array.isArray(costs) && costs.length) {
           costs.forEach(o => {
             const [d, s] = Object.entries(o)[0] || ['', ''];
@@ -396,3 +400,4 @@
     </script>
   </body>
 </html>
+
