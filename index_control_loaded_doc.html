@@ -39,14 +39,16 @@
         color: var(--tg-theme-text-color);
       }
       textarea { height: 30vh; resize: vertical; }
-      .cost-row {
+      .cost-row, .dynamic-field-row {
         display: flex;
         align-items: flex-start;
         margin-bottom: 8px;
       }
       .cost-row textarea,
-      .cost-row input { font-size: 14px; }
-      .cost-row button {
+      .cost-row input,
+      .dynamic-field-row input { font-size: 14px; }
+      .cost-row button,
+      .dynamic-field-row button {
         background: none;
         border: none;
         font-size: 20px;
@@ -259,6 +261,67 @@
         addField('Итого', data.total, 'total', 'number');
       }
 
+      // Функция для создания динамических полей с кнопками + и -
+      function renderDynamicFields() {
+        const fieldTypes = [
+          { label: 'Дата покупки', name: 'date_purchase', type: 'date', value: formatDate(data.date_purchase) },
+          { label: 'Дата убытия', name: 'departure_date', type: 'date', value: formatDate(data.departure_date) },
+          { label: 'Дата прибытия', name: 'arrival_date', type: 'date', value: formatDate(data.arrival_date) },
+          { label: 'Населённый пункт убытия', name: 'departure_city', type: 'text', value: data.departure_city || '' },
+          { label: 'Населённый пункт прибытия', name: 'arrival_city', type: 'text', value: data.arrival_city || '' }
+        ];
+
+        fieldTypes.forEach(fieldType => {
+          const c = document.createElement('div');
+          c.className = 'field';
+          const lbl = document.createElement('label');
+          lbl.textContent = fieldType.label;
+          c.append(lbl);
+          form.append(c);
+
+          function updDel() {
+            const rows = c.querySelectorAll('.dynamic-field-row');
+            rows.forEach(r => {
+              r.querySelector('.del-btn').style.visibility =
+                rows.length > 1 ? 'visible' : 'hidden';
+            });
+          }
+
+          function addRow(value = '') {
+            const r = document.createElement('div');
+            r.className = 'dynamic-field-row';
+            const input = document.createElement('input');
+            input.type = fieldType.type;
+            input.name = fieldType.name;
+            input.value = value;
+            if (fieldType.type === 'date' && value) {
+              input.value = value.split('.').reverse().join('-');
+            }
+            const plus = document.createElement('button');
+            plus.type = 'button';
+            plus.textContent = '➕';
+            plus.onclick = () => {
+              addRow();
+              updDel();
+            };
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.textContent = '➖';
+            del.className = 'del-btn';
+            del.onclick = () => {
+              r.remove();
+              updDel();
+            };
+            r.append(input, plus, del);
+            c.append(r);
+            updDel();
+          }
+
+          // Добавляем первую строку с данными или пустую
+          addRow(fieldType.value);
+        });
+      }
+
       // Добавляем поддержку нового типа документа
       switch (data.type_doc) {
         case 'cash_receipt':
@@ -291,6 +354,7 @@
             data.type_doc === 'other' ? 'неизвестен' : data.type_doc,
             'type_doc'
           );
+          renderDynamicFields();
           renderCosts(data.cost_category);
           addTotal();
           break;
@@ -303,7 +367,17 @@
             fd.costs = fd.costs || [];
             if (k === 'cost_desc') fd.costs.push({ desc: v });
             else fd.costs[fd.costs.length - 1].sum = v;
-          } else fd[k] = v;
+          } else {
+            // Для динамических полей собираем массивы
+            if (fd[k]) {
+              if (!Array.isArray(fd[k])) {
+                fd[k] = [fd[k]];
+              }
+              fd[k].push(v);
+            } else {
+              fd[k] = v;
+            }
+          }
         });
         WebApp.sendData(JSON.stringify({ action: 'save_approval_doc', data: fd }));
       };
@@ -321,4 +395,3 @@
     </script>
   </body>
 </html>
-
