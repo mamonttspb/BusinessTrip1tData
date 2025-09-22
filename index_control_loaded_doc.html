@@ -107,23 +107,24 @@
         if (typeof output === 'string') {
           try { output = JSON.parse(output); } catch {}
         }
-        data = { ...(output || {}), real_name_file: rawData.real_name_file, page: rawData.page };
+        data = {
+          ...(output || {}),
+          real_name_file: rawData.real_name_file,
+          page: rawData.page
+        };
       } catch {
         data = {};
       }
 
+      // Установка заголовка
       function setFormTitle() {
         const el = document.getElementById('formTitle');
         let title = 'Данные документа';
         if (data.real_name_file) {
           title = data.real_name_file.replace(/\.[^/.]+$/, '');
         }
-         // ВСТАВИТЬ НАЧАЛО: проверка номера страницы
+        // Если страница > 0 — добавляем номер
         if (data.page && Number(data.page) > 0) {
-          title += `, стр. № ${data.page}`;
-        }
-        // ВСТАВИТЬ КОНЕЦ
-        if (data.page) {
           title += `, стр. № ${data.page}`;
         }
         el.textContent = title;
@@ -143,30 +144,40 @@
 
       if (Array.isArray(data.cost_category)) {
         data.cost_category = data.cost_category.map(o => {
-          const [k,v] = Object.entries(o)[0] || ['', ''];
+          const [k, v] = Object.entries(o)[0] || ['', ''];
           return { [k]: normalizeNum(v) };
         });
       }
-      data.total = normalizeNum(data['total, RUB'] || data['total, руб'] || data.total);
+      data.total = normalizeNum(
+        data['total, RUB'] ||
+        data['total, руб'] ||
+        data.total
+      );
 
       const form = document.getElementById('docForm');
       const errorDiv = document.getElementById('error');
       if (data.error) errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
 
-      function addField(label, val='', name, type='text') {
+      function addField(label, val = '', name, type = 'text') {
         const div = document.createElement('div');
         div.className = 'field';
         const lbl = document.createElement('label');
         lbl.textContent = label;
-        const input = (type==='textarea' ? document.createElement('textarea') : document.createElement('input'));
-        if (type!=='textarea') input.type = type;
+        const input = (type === 'textarea'
+          ? document.createElement('textarea')
+          : document.createElement('input')
+        );
+        if (type !== 'textarea') input.type = type;
         input.name = name;
         input.value = val;
-        if (['date_purchase','departure_date','arrival_date','check_in_date','check_out_date'].includes(name)) {
+        if (
+          ['date_purchase', 'departure_date', 'arrival_date', 'check_in_date', 'check_out_date']
+            .includes(name)
+        ) {
           input.type = 'date';
           input.value = val ? val.split('.').reverse().join('-') : '';
         }
-        if (name==='total') {
+        if (name === 'total') {
           input.id = 'totalInput';
           input.readOnly = true;
         }
@@ -176,9 +187,10 @@
       }
 
       function computeAndFillTotal() {
-        const sums = Array.from(document.querySelectorAll('input[name="cost_sum"]'))
-          .map(i => parseFloat(i.value) || 0);
-        const t = sums.reduce((a,b)=>a+b,0).toFixed(2);
+        const sums = Array.from(
+          document.querySelectorAll('input[name="cost_sum"]')
+        ).map(i => parseFloat(i.value) || 0);
+        const t = sums.reduce((a, b) => a + b, 0).toFixed(2);
         const el = document.getElementById('totalInput');
         if (el) el.value = t;
       }
@@ -194,33 +206,50 @@
         function updDel() {
           const rows = c.querySelectorAll('.cost-row');
           rows.forEach(r => {
-            r.querySelector('.del-btn').style.visibility = rows.length>1 ? 'visible' : 'hidden';
+            r.querySelector('.del-btn').style.visibility =
+              rows.length > 1 ? 'visible' : 'hidden';
           });
         }
 
-        function addRow(desc='', sum='') {
+        function addRow(desc = '', sum = '') {
           const r = document.createElement('div');
           r.className = 'cost-row';
           const t = document.createElement('textarea');
-          t.name='cost_desc'; t.placeholder='Описание'; t.value=desc;
+          t.name = 'cost_desc';
+          t.placeholder = 'Описание';
+          t.value = desc;
           const num = document.createElement('input');
-          num.type='number'; num.step='0.01'; num.name='cost_sum'; num.value=sum;
+          num.type = 'number';
+          num.step = '0.01';
+          num.name = 'cost_sum';
+          num.value = sum;
           num.oninput = computeAndFillTotal;
           const plus = document.createElement('button');
-          plus.type='button'; plus.textContent='➕';
-          plus.onclick = ()=>{ addRow(); updDel(); computeAndFillTotal(); };
+          plus.type = 'button';
+          plus.textContent = '➕';
+          plus.onclick = () => {
+            addRow();
+            updDel();
+            computeAndFillTotal();
+          };
           const del = document.createElement('button');
-          del.type='button'; del.textContent='➖'; del.className='del-btn';
-          del.onclick = ()=>{ r.remove(); updDel(); computeAndFillTotal(); };
+          del.type = 'button';
+          del.textContent = '➖';
+          del.className = 'del-btn';
+          del.onclick = () => {
+            r.remove();
+            updDel();
+            computeAndFillTotal();
+          };
           r.append(t, num, plus, del);
           c.append(r);
           updDel();
         }
 
         if (Array.isArray(costs) && costs.length) {
-          costs.forEach(o=> {
-            const [d,s] = Object.entries(o)[0]||['',''];
-            addRow(d,s);
+          costs.forEach(o => {
+            const [d, s] = Object.entries(o)[0] || ['', ''];
+            addRow(d, s);
           });
         } else addRow();
         computeAndFillTotal();
@@ -230,7 +259,7 @@
         addField('Итого', data.total, 'total', 'number');
       }
 
-      // Вставляем поля в зависимости от типа документа
+      // Добавляем поддержку нового типа документа
       switch (data.type_doc) {
         case 'cash_receipt':
           addField('Тип документа', 'кассовый чек', 'type_doc');
@@ -256,17 +285,9 @@
           addField('Дата выезда', formatDate(data.departure_date), 'check_out_date');
           break;
 
-        case 'travel_insurance':
-          addField('Тип документа', 'страховой полис путешественника', 'type_doc');
-          addField('Номер полиса', data.policy_number, 'policy_number');
-          addField('Дата начала', formatDate(data.start_date), 'start_date');
-          addField('Дата окончания', formatDate(data.end_date), 'end_date');
-          renderCosts(data.cost_category);
-          addTotal();
-          break;
-
         default:
-          addField('Тип документа',
+          addField(
+            'Тип документа',
             data.type_doc === 'other' ? 'неизвестен' : data.type_doc,
             'type_doc'
           );
@@ -275,29 +296,28 @@
           break;
       }
 
-      document.getElementById('saveBtn').onclick = ()=> {
+      document.getElementById('saveBtn').onclick = () => {
         const fd = {};
-        new FormData(form).forEach((v,k)=>{
-          if (k==='cost_desc'||k==='cost_sum') {
-            fd.costs = fd.costs||[];
-            if (k==='cost_desc') fd.costs.push({desc:v});
-            else fd.costs[fd.costs.length-1].sum=v;
-          } else fd[k]=v;
+        new FormData(form).forEach((v, k) => {
+          if (k === 'cost_desc' || k === 'cost_sum') {
+            fd.costs = fd.costs || [];
+            if (k === 'cost_desc') fd.costs.push({ desc: v });
+            else fd.costs[fd.costs.length - 1].sum = v;
+          } else fd[k] = v;
         });
-        WebApp.sendData(JSON.stringify({action:'save_approval_doc',data:fd}));
+        WebApp.sendData(JSON.stringify({ action: 'save_approval_doc', data: fd }));
       };
-      document.getElementById('skipBtn').onclick = ()=> {
-        WebApp.sendData(JSON.stringify({action:'skip_current_file'}));
+      document.getElementById('skipBtn').onclick = () => {
+        WebApp.sendData(JSON.stringify({ action: 'skip_current_file' }));
       };
-      document.getElementById('cancelBtn').onclick = ()=> {
-        WebApp.sendData(JSON.stringify({action:'cancel_approval_doc'}));
+      document.getElementById('cancelBtn').onclick = () => {
+        WebApp.sendData(JSON.stringify({ action: 'cancel_approval_doc' }));
         WebApp.close();
       };
-      WebApp.onEvent('themeChanged', ()=> {
+      WebApp.onEvent('themeChanged', () => {
         document.body.style.backgroundColor = WebApp.themeParams.bg_color;
         document.body.style.color = WebApp.themeParams.text_color;
       });
     </script>
   </body>
 </html>
-
