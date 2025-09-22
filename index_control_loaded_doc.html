@@ -57,7 +57,7 @@
         margin-top: 6px;
         color: var(--tg-theme-button-color, #0088cc);
       }
-      .del-btn { visibility: hidden; }
+      .del-btn { /* visibility controlled only for cost rows */ }
       #buttons {
         margin-top: 20px;
         display: flex;
@@ -118,14 +118,12 @@
         data = {};
       }
 
-      // Установка заголовка
       function setFormTitle() {
         const el = document.getElementById('formTitle');
         let title = 'Данные документа';
         if (data.real_name_file) {
           title = data.real_name_file.replace(/\.[^/.]+$/, '');
         }
-        // Если страница > 0 — добавляем номер
         if (data.page && Number(data.page) > 0) {
           title += `, стр. № ${data.page}`;
         }
@@ -165,17 +163,14 @@
         div.className = 'field';
         const lbl = document.createElement('label');
         lbl.textContent = label;
-        const input = (type === 'textarea'
+        const input = type === 'textarea'
           ? document.createElement('textarea')
-          : document.createElement('input')
-        );
+          : document.createElement('input');
         if (type !== 'textarea') input.type = type;
         input.name = name;
         input.value = val;
-        if (
-          ['date_purchase', 'departure_date', 'arrival_date', 'check_in_date', 'check_out_date']
-            .includes(name)
-        ) {
+        if (['date_purchase','departure_date','arrival_date','check_in_date','check_out_date']
+            .includes(name)) {
           input.type = 'date';
           input.value = val ? val.split('.').reverse().join('-') : '';
         }
@@ -189,9 +184,8 @@
       }
 
       function computeAndFillTotal() {
-        const sums = Array.from(
-          document.querySelectorAll('input[name="cost_sum"]')
-        ).map(i => parseFloat(i.value) || 0);
+        const sums = Array.from(document.querySelectorAll('input[name="cost_sum"]'))
+          .map(i => parseFloat(i.value) || 0);
         const t = sums.reduce((a, b) => a + b, 0).toFixed(2);
         const el = document.getElementById('totalInput');
         if (el) el.value = t;
@@ -261,7 +255,7 @@
         addField('Итого', data.total, 'total', 'number');
       }
 
-      // Функция для создания динамических полей с кнопками + и -
+      // Динамические поля для типа "other"
       function renderDynamicFields() {
         const fieldTypes = [
           { label: 'Дата покупки', name: 'date_purchase', type: 'date', value: formatDate(data.date_purchase) },
@@ -279,14 +273,6 @@
           c.append(lbl);
           form.append(c);
 
-          function updDel() {
-            const rows = c.querySelectorAll('.dynamic-field-row');
-            rows.forEach(r => {
-              r.querySelector('.del-btn').style.visibility =
-                rows.length > 1 ? 'visible' : 'hidden';
-            });
-          }
-
           function addRow(value = '') {
             const r = document.createElement('div');
             r.className = 'dynamic-field-row';
@@ -300,29 +286,51 @@
             const plus = document.createElement('button');
             plus.type = 'button';
             plus.textContent = '➕';
-            plus.onclick = () => {
-              addRow();
-              updDel();
-            };
+            plus.onclick = () => { addRow(); };
             const del = document.createElement('button');
             del.type = 'button';
             del.textContent = '➖';
-            del.className = 'del-btn';
-            del.onclick = () => {
-              r.remove();
-              updDel();
-            };
+            del.onclick = () => { r.remove(); };
             r.append(input, plus, del);
             c.append(r);
-            updDel();
           }
 
-          // Добавляем первую строку с данными или пустую
-          addRow(fieldType.value);
+          if (fieldType.value) addRow(fieldType.value);
+          else addRow();
         });
       }
 
-      // Добавляем поддержку нового типа документа
+      function renderDynamicTotal() {
+        const c = document.createElement('div');
+        c.className = 'field';
+        const lbl = document.createElement('label');
+        lbl.textContent = 'Итого';
+        c.append(lbl);
+        form.append(c);
+
+        function addRow(value = '') {
+          const r = document.createElement('div');
+          r.className = 'dynamic-field-row';
+          const input = document.createElement('input');
+          input.type = 'number';
+          input.step = '0.01';
+          input.name = 'total';
+          input.value = value;
+          const plus = document.createElement('button');
+          plus.type = 'button';
+          plus.textContent = '➕';
+          plus.onclick = () => { addRow(); };
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.textContent = '➖';
+          del.onclick = () => { r.remove(); };
+          r.append(input, plus, del);
+          c.append(r);
+        }
+
+        addRow(data.total || '');
+      }
+
       switch (data.type_doc) {
         case 'cash_receipt':
           addField('Тип документа', 'кассовый чек', 'type_doc');
@@ -349,14 +357,10 @@
           break;
 
         default:
-          addField(
-            'Тип документа',
-            data.type_doc === 'other' ? 'неизвестен' : data.type_doc,
-            'type_doc'
-          );
+          addField('Тип документа', 'неизвестен', 'type_doc');
           renderDynamicFields();
           renderCosts(data.cost_category);
-          addTotal();
+          renderDynamicTotal();
           break;
       }
 
@@ -368,11 +372,8 @@
             if (k === 'cost_desc') fd.costs.push({ desc: v });
             else fd.costs[fd.costs.length - 1].sum = v;
           } else {
-            // Для динамических полей собираем массивы
             if (fd[k]) {
-              if (!Array.isArray(fd[k])) {
-                fd[k] = [fd[k]];
-              }
+              if (!Array.isArray(fd[k])) fd[k] = [fd[k]];
               fd[k].push(v);
             } else {
               fd[k] = v;
