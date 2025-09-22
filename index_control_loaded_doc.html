@@ -95,36 +95,23 @@
       WebApp.ready();
       WebApp.expand();
 
-      // Тема
       document.body.style.backgroundColor = WebApp.themeParams.bg_color || '';
       document.body.style.color = WebApp.themeParams.text_color || '';
 
-      // Парсинг
       const params = new URLSearchParams(window.location.search);
       const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
       let data = {};
       try {
         const rawData = JSON.parse(decodeURIComponent(startParam || '{}'));
-
-        // 1) если output — строка, пытаемся распарсить
         let output = rawData.output;
         if (typeof output === 'string') {
-          try {
-            output = JSON.parse(output);
-          } catch {}
+          try { output = JSON.parse(output); } catch {}
         }
-
-        // 2) собираем итоговый объект
-        data = {
-          ...(output || {}),
-          real_name_file: rawData.real_name_file,
-          page: rawData.page,
-        };
+        data = { ...(output || {}), real_name_file: rawData.real_name_file, page: rawData.page };
       } catch {
         data = {};
       }
 
-      // Установка заголовка
       function setFormTitle() {
         const el = document.getElementById('formTitle');
         let title = 'Данные документа';
@@ -139,7 +126,6 @@
       }
       setFormTitle();
 
-      // Вспомогательные
       function normalizeNum(s) {
         return s == null ? '' : String(s).replace(/\s/g, '').replace(',', '.');
       }
@@ -150,18 +136,14 @@
         return m ? `${m[3]}.${m[2]}.${m[1]}` : d;
       }
 
-      // Подготовка cost_category и total
       if (Array.isArray(data.cost_category)) {
         data.cost_category = data.cost_category.map(o => {
           const [k,v] = Object.entries(o)[0] || ['', ''];
           return { [k]: normalizeNum(v) };
         });
       }
-      data.total = normalizeNum(
-        data['total, RUB'] || data['total, руб'] || data.total
-      );
+      data.total = normalizeNum(data['total, RUB'] || data['total, руб'] || data.total);
 
-      // Построение формы
       const form = document.getElementById('docForm');
       const errorDiv = document.getElementById('error');
       if (data.error) errorDiv.textContent = `ВНИМАНИЕ: ${data.error}`;
@@ -175,7 +157,7 @@
         if (type!=='textarea') input.type = type;
         input.name = name;
         input.value = val;
-        if (['date_purchase','departure_date','arrival_date','check_in_day','check_out_date'].includes(name)) {
+        if (['date_purchase','departure_date','arrival_date','check_in_date','check_out_date'].includes(name)) {
           input.type = 'date';
           input.value = val ? val.split('.').reverse().join('-') : '';
         }
@@ -243,21 +225,51 @@
         addField('Итого', data.total, 'total', 'number');
       }
 
-      // В зависимости от type_doc
-      switch(data.type_doc) {
+      // Вставляем поля в зависимости от типа документа
+      switch (data.type_doc) {
         case 'cash_receipt':
-          addField('Тип документа','кассовый чек','type_doc');
-          addField('Дата покупки',data.date_purchase,'date_purchase','date');
+          addField('Тип документа', 'кассовый чек', 'type_doc');
+          addField('Дата покупки', formatDate(data.date_purchase), 'date_purchase');
           renderCosts(data.cost_category);
           addTotal();
           break;
-        default:
-          addField('Тип документа', data.type_doc||'','type_doc');
+
+        case 'itinerary_receipt':
+          addField('Тип документа', 'маршрутная квитанция', 'type_doc');
+          addField('Населённый пункт убытия', data.departure_city, 'departure_city');
+          addField('Дата убытия', formatDate(data.departure_date), 'departure_date');
+          addField('Населённый пункт прибытия', data.arrival_city, 'arrival_city');
+          addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date');
           renderCosts(data.cost_category);
           addTotal();
+          break;
+
+        case 'hotel_voucher':
+          addField('Тип документа', 'ваучер проживания в отеле', 'type_doc');
+          addField('Населённый пункт', data.arrival_city, 'city');
+          addField('Дата заселения', formatDate(data.arrival_date), 'check_in_date');
+          addField('Дата выезда', formatDate(data.departure_date), 'check_out_date');
+          break;
+
+        case 'travel_insurance':
+          addField('Тип документа', 'страховой полис путешественника', 'type_doc');
+          addField('Номер полиса', data.policy_number, 'policy_number');
+          addField('Дата начала', formatDate(data.start_date), 'start_date');
+          addField('Дата окончания', formatDate(data.end_date), 'end_date');
+          renderCosts(data.cost_category);
+          addTotal();
+          break;
+
+        default:
+          addField('Тип документа',
+            data.type_doc === 'other' ? 'неизвестен' : data.type_doc,
+            'type_doc'
+          );
+          renderCosts(data.cost_category);
+          addTotal();
+          break;
       }
 
-      // Кнопки
       document.getElementById('saveBtn').onclick = ()=> {
         const fd = {};
         new FormData(form).forEach((v,k)=>{
@@ -276,7 +288,6 @@
         WebApp.sendData(JSON.stringify({action:'cancel_approval_doc'}));
         WebApp.close();
       };
-
       WebApp.onEvent('themeChanged', ()=> {
         document.body.style.backgroundColor = WebApp.themeParams.bg_color;
         document.body.style.color = WebApp.themeParams.text_color;
