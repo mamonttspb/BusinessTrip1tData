@@ -133,7 +133,12 @@
       setFormTitle();
 
       function normalizeNum(s) {
-        return s == null ? '' : String(s).replace(/\s/g, '').replace(',', '.');
+        return s == null
+          ? ''
+          : String(s)
+              .replace(/\s/g, '')
+              .replace(',', '.')
+              .replace(/[^0-9.]/g, '');
       }
       function formatDate(d) {
         if (!d) return '';
@@ -259,7 +264,6 @@
         addField('Итого', data.total, 'total', 'number');
       }
 
-      // Динамические поля для типа "other"
       function renderDynamicFields() {
         const fieldTypes = [
           { label: 'Дата покупки', name: 'date_purchase', type: 'date', value: formatDate(data.date_purchase) },
@@ -341,6 +345,7 @@
           addField('Дата покупки', formatDate(data.date_purchase), 'date_purchase');
           renderCosts(data.cost_category);
           addTotal();
+          computeAndFillTotal();
           break;
 
         case 'itinerary_receipt':
@@ -351,6 +356,7 @@
           addField('Дата прибытия', formatDate(data.arrival_date), 'arrival_date');
           renderCosts(data.cost_category);
           addTotal();
+          computeAndFillTotal();
           break;
 
         case 'hotel_voucher':
