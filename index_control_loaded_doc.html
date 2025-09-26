@@ -96,28 +96,51 @@
       const WebApp = window.Telegram.WebApp;
       WebApp.ready();
       WebApp.expand();
-
-      document.body.style.backgroundColor = WebApp.themeParams.bg_color || '';
-      document.body.style.color = WebApp.themeParams.text_color || '';
-
+    
+      // Получаем параметр data из URL или Telegram initData
       const params = new URLSearchParams(window.location.search);
-      const startParam = WebApp.initDataUnsafe?.start_param || params.get('data');
-      let data = {};
-      try {
-        const rawData = JSON.parse(decodeURIComponent(startParam || '{}'));
-        let output = rawData.output;
-        if (typeof output === 'string') {
-          try { output = JSON.parse(output); } catch {}
+      const rawParam = WebApp.initDataUnsafe?.start_param || params.get('data') || '{}';
+    
+      // Функция безопасного многократного разбора JSON
+      function safeParse(jsonStr) {
+        let result = jsonStr;
+        // пробуем один раз
+        try {
+          result = JSON.parse(result);
+        } catch {}
+        // если после этого всё ещё строка, пытаемся ещё раз
+        if (typeof result === 'string') {
+          try {
+            result = JSON.parse(result);
+          } catch {}
         }
-        data = {
-          ...(output || {}),
-          real_name_file: rawData.real_name_file,
-          page: rawData.page
-        };
-      } catch {
-        data = {};
+        return result;
       }
-
+    
+      // Декодируем и парсим параметр
+      let payload;
+      try {
+        const decoded = decodeURIComponent(rawParam);
+        payload = safeParse(decoded);
+      } catch {
+        payload = {};
+      }
+    
+      // payload должен содержать { output, real_name_file, page }
+      const { output, real_name_file, page } = payload;
+      // output может быть объектом или строкой JSON
+      const data = {
+        ...(typeof output === 'object' && output !== null
+            ? output
+            : safeParse(output || '{}')),
+        real_name_file,
+        page,
+      };
+    
+      // Далее код отрисовки формы остаётся без изменений...
+      // (setFormTitle, normalizeNum, formatDate, renderCosts и другие функции)
+    
+      // Пример установки заголовка
       function setFormTitle() {
         const el = document.getElementById('formTitle');
         let title = 'Данные документа';
@@ -130,6 +153,7 @@
         el.textContent = title;
         document.title = title;
       }
+    
       setFormTitle();
 
       function normalizeNum(s) {
@@ -413,4 +437,5 @@
     </script>
   </body>
 </html>
+
 
