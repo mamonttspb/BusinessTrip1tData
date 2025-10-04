@@ -1,0 +1,210 @@
+# Заявка на регистрацию
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заявка на регистрацию</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        .form-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:invalid {
+            border-color: #ff4444;
+        }
+        input:valid {
+            border-color: #00aa00;
+        }
+        .error-message {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .cancel-btn {
+            flex: 1;
+            padding: 12px;
+            background: #cccccc;
+            color: #666666;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Заявка на регистрацию</h1>
+        <form id="regForm">
+            <div class="form-group">
+                <label for="lastName">Фамилия *</label>
+                <input type="text" id="lastName" name="lastName" required placeholder="Введите фамилию">
+                <div class="error-message" id="lastName-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="firstName">Имя *</label>
+                <input type="text" id="firstName" name="firstName" required placeholder="Введите имя">
+                <div class="error-message" id="firstName-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="middleName">Отчество *</label>
+                <input type="text" id="middleName" name="middleName" required placeholder="Введите отчество">
+                <div class="error-message" id="middleName-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="birthDate">Дата рождения *</label>
+                <input type="text" id="birthDate" name="birthDate" required placeholder="дд.мм.YYYY" pattern="\\d{2}\\.\\d{2}\\.\\d{4}">
+                <div class="error-message" id="birthDate-error">Введите дату в формате дд.мм.YYYY</div>
+            </div>
+            <div class="form-group">
+                <label for="manager">Телеграм руководителя *</label>
+                <input type="text" id="manager" name="manager" required placeholder="Например: https://t.me/Ivanov">
+                <div class="error-message" id="manager-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="department">Отдел или проект *</label>
+                <input type="text" id="department" name="department" required placeholder="Введите отдел или проект">
+                <div class="error-message" id="department-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="position">Должность *</label>
+                <input type="text" id="position" name="position" required placeholder="Введите должность">
+                <div class="error-message" id="position-error">Обязательное поле</div>
+            </div>
+        </form>
+        <div class="button-group">
+            <button class="cancel-btn" id="cancelBtn">Отмена</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+        document.body.style.color = tg.themeParams.text_color || '#000000';
+
+        const form = document.getElementById('regForm');
+        const fields = [
+            'lastName','firstName','middleName',
+            'birthDate','manager','department','position'
+        ];
+        const errors = {};
+        fields.forEach(id => {
+            errors[id] = document.getElementById(`${id}-error`);
+        });
+
+        function validateForm() {
+            let valid = true;
+            fields.forEach(id => {
+                const input = document.getElementById(id);
+                if (!input.checkValidity()) {
+                    errors[id].style.display = 'block';
+                    input.style.borderColor = '#ff4444';
+                    valid = false;
+                } else {
+                    errors[id].style.display = 'none';
+                    input.style.borderColor = '#00aa00';
+                }
+            });
+            return valid;
+        }
+
+        function updateMainButton() {
+            if (validateForm()) {
+                tg.MainButton.enable();
+                tg.MainButton.setParams({
+                    color: tg.themeParams.button_color || '#0088cc',
+                    text_color: tg.themeParams.button_text_color || '#ffffff'
+                });
+            } else {
+                tg.MainButton.disable();
+                tg.MainButton.setParams({
+                    color: '#cccccc',
+                    text_color: '#666666'
+                });
+            }
+        }
+
+        fields.forEach(id => {
+            const input = document.getElementById(id);
+            input.addEventListener('input', updateMainButton);
+            input.addEventListener('blur', updateMainButton);
+        });
+        window.addEventListener('focus', updateMainButton);
+
+        form.addEventListener('submit', e => e.preventDefault());
+
+        tg.MainButton.text = "Отправить";
+        tg.MainButton.show();
+        updateMainButton();
+
+        tg.MainButton.onClick(() => {
+            if (!validateForm()) return;
+
+            const data = {};
+            fields.forEach(id => {
+                data[id] = document.getElementById(id).value.trim();
+            });
+
+            // Преобразование даты из дд.мм.YYYY в YYYY-MM-dd
+            const [dd,mm,yyyy] = data.birthDate.split('.');
+            data.birthDate = `${yyyy}-${mm}-${dd}`;
+
+            data.user = tg.initDataUnsafe?.user;
+
+            tg.MainButton.showProgress();
+            try {
+                tg.sendData(JSON.stringify(data));
+                tg.close();
+            } catch (err) {
+                tg.MainButton.hideProgress();
+                console.error('Ошибка при отправке:', err);
+            }
+        });
+
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            tg.close();
+        });
+
+        tg.onEvent('themeChanged', () => {
+            document.body.style.backgroundColor = tg.themeParams.bg_color;
+            document.body.style.color = tg.themeParams.text_color;
+            updateMainButton();
+        });
+    </script>
+</body>
+</html>
