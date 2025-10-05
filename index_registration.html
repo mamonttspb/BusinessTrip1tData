@@ -94,17 +94,18 @@
         tg.ready();
         tg.expand();
 
-        // Применение темы
-        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
-        document.body.style.color = tg.themeParams.text_color || '#000000';
-
-        // Показываем кнопки сразу
+        // Всегда показываем и активируем кнопку "Отмена"
         tg.BackButton.show();
         tg.BackButton.enable();
+        tg.BackButton.onClick(() => tg.close());
+
+        // Настройка кнопки "Отправить" (MainButton)
         tg.MainButton.show();
         tg.MainButton.text = "Отправить";
 
-        tg.BackButton.onClick(() => tg.close());
+        // Применение темы
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+        document.body.style.color = tg.themeParams.text_color || '#000000';
 
         const form = document.getElementById('regForm');
         const fields = ['lastName','firstName','middleName','birthDate','manager','department','position'];
@@ -127,7 +128,7 @@
             return valid;
         }
 
-        function updateMainButton() {
+        function updateButtons() {
             if (validateForm()) {
                 tg.MainButton.enable();
                 tg.MainButton.setParams({ color: '#28a745', text_color: '#ffffff' });
@@ -139,10 +140,10 @@
 
         fields.forEach(id => {
             const input = document.getElementById(id);
-            input.addEventListener('input', updateMainButton);
-            input.addEventListener('blur', updateMainButton);
+            input.addEventListener('input', updateButtons);
+            input.addEventListener('blur', updateButtons);
         });
-        window.addEventListener('focus', updateMainButton);
+        window.addEventListener('focus', updateButtons);
 
         form.addEventListener('submit', e => e.preventDefault());
 
@@ -163,7 +164,7 @@
         tg.onEvent('themeChanged', () => {
             document.body.style.backgroundColor = tg.themeParams.bg_color;
             document.body.style.color = tg.themeParams.text_color;
-            updateMainButton();
+            updateButtons();
         });
     </script>
 </body>
