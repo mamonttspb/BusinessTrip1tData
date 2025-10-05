@@ -45,34 +45,6 @@
             margin-top: 5px;
             display: none;
         }
-        .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .submit-btn {
-            padding: 12px;
-            background: #28a745;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            opacity: 0.5;
-        }
-        .submit-btn:enabled {
-            opacity: 1;
-        }
-        .cancel-btn {
-            padding: 12px;
-            background: #d9534f;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
@@ -115,10 +87,6 @@
                 <div class="error-message" id="position-error">Обязательное поле</div>
             </div>
         </form>
-        <div class="button-group">
-            <button class="submit-btn" id="submitBtn" disabled>Отправить</button>
-            <button class="cancel-btn" id="cancelBtn">Отмена</button>
-        </div>
     </div>
 
     <script>
@@ -130,8 +98,6 @@
         document.body.style.color = tg.themeParams.text_color || '#000000';
 
         const form = document.getElementById('regForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
         const fields = [
             'lastName','firstName','middleName',
             'birthDate','manager','department','position'
@@ -157,16 +123,14 @@
             return valid;
         }
 
-        function updateMainButton() {
+        function updateButtons() {
             if (validateForm()) {
-                submitBtn.disabled = false;
                 tg.MainButton.enable();
                 tg.MainButton.setParams({
                     color: '#28a745',
                     text_color: '#ffffff'
                 });
             } else {
-                submitBtn.disabled = true;
                 tg.MainButton.disable();
                 tg.MainButton.setParams({
                     color: '#cccccc',
@@ -177,46 +141,41 @@
 
         fields.forEach(id => {
             const input = document.getElementById(id);
-            input.addEventListener('input', updateMainButton);
-            input.addEventListener('blur', updateMainButton);
+            input.addEventListener('input', updateButtons);
+            input.addEventListener('blur', updateButtons);
         });
-        window.addEventListener('focus', updateMainButton);
+        window.addEventListener('focus', updateButtons);
 
         form.addEventListener('submit', e => e.preventDefault());
 
+        // Основная кнопка «Отправить»
         tg.MainButton.text = "Отправить";
         tg.MainButton.show();
-        updateMainButton();
-
+        updateButtons();
         tg.MainButton.onClick(() => {
             if (!validateForm()) return;
-
             const data = {};
             fields.forEach(id => {
                 data[id] = document.getElementById(id).value.trim();
             });
-
-            // birthDate уже в формате YYYY-MM-DD из <input type="date">
             data.user = tg.initDataUnsafe?.user;
-
             tg.MainButton.showProgress();
             try {
                 tg.sendData(JSON.stringify(data));
                 tg.close();
-            } catch (err) {
+            } catch {
                 tg.MainButton.hideProgress();
-                console.error('Ошибка при отправке:', err);
             }
         });
 
-        cancelBtn.addEventListener('click', () => {
-            tg.close();
-        });
+        // Кнопка «Отмена» через BackButton
+        tg.BackButton.show();
+        tg.BackButton.onClick(() => tg.close());
 
         tg.onEvent('themeChanged', () => {
             document.body.style.backgroundColor = tg.themeParams.bg_color;
             document.body.style.color = tg.themeParams.text_color;
-            updateMainButton();
+            updateButtons();
         });
     </script>
 </body>
