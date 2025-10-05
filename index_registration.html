@@ -93,48 +93,47 @@
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-    
+
         // Применение темы (без изменений)
         document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
         document.body.style.color = tg.themeParams.text_color || '#000000';
-    
-        // ИНИЦИАЛИЗАЦИЯ НИЖНИХ КНОПОК
-        // 1) Основная кнопка "Отправить": по умолчанию неактивна и серая, активируется при валидной форме
+
+        // КНОПКИ В НИЖНЕЙ ПАНЕЛИ
+        // Основная: «Отправить» — изначально серая и неактивна
         tg.MainButton.setParams({
             text: "Отправить",
             color: "#cccccc",
-            text_color: "#666666",
-            is_active: false, // эквивалент disable
-            is_visible: true
+            text_color: "#666666"
         });
         tg.MainButton.show();
-    
-        // 2) Вторая нижняя кнопка "Отмена": всегда видна и активна
-        // Проверим поддержку SecondaryButton (на старых клиентах может отсутствовать)
+        tg.MainButton.disable();
+
+        // Вторая кнопка: «Отмена» — всегда видима и активна, позиция ПОД основной
         if (tg.SecondaryButton && tg.SecondaryButton.show) {
             tg.SecondaryButton.setParams({
                 text: "Отмена",
-                color: "#d46a6a", // спокойный красный
+                color: "#d46a6a",
                 text_color: "#ffffff",
+                is_visible: true,
                 is_active: true,
-                is_visible: true
+                position: "bottom"
             });
             tg.SecondaryButton.show();
-    
-            tg.onEvent('secondaryButtonClicked', () => {
-                tg.close();
-            });
+            tg.onEvent('secondaryButtonClicked', () => tg.close());
+            // Скрываем BackButton, чтобы не дублировать отмену в шапке
+            if (tg.BackButton && tg.BackButton.hide) tg.BackButton.hide();
         } else {
-            // Фолбэк: если SecondaryButton не поддерживается, используем BackButton как «Отмена» в шапке
+            // Фолбэк: если SecondaryButton не поддерживается, показываем «Отмена» в шапке
             tg.BackButton.show();
+            tg.BackButton.enable?.();
             tg.BackButton.onClick(() => tg.close());
         }
-    
+
         const form = document.getElementById('regForm');
         const fields = ['lastName','firstName','middleName','birthDate','manager','department','position'];
         const errors = {};
         fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
-    
+
         function validateForm() {
             let valid = true;
             fields.forEach(id => {
@@ -150,36 +149,26 @@
             });
             return valid;
         }
-    
+
         function updateMainButton() {
             if (validateForm()) {
-                // активируем и красим «Отправить» в зелёный
-                tg.MainButton.setParams({
-                    color: '#28a745',
-                    text_color: '#ffffff',
-                    is_active: true
-                });
                 tg.MainButton.enable();
+                tg.MainButton.setParams({ color: '#28a745', text_color: '#ffffff' });
             } else {
-                // деактивируем и красим «Отправить» в серый
-                tg.MainButton.setParams({
-                    color: '#cccccc',
-                    text_color: '#666666',
-                    is_active: false
-                });
                 tg.MainButton.disable();
+                tg.MainButton.setParams({ color: '#cccccc', text_color: '#666666' });
             }
         }
-    
+
         fields.forEach(id => {
             const input = document.getElementById(id);
             input.addEventListener('input', updateMainButton);
             input.addEventListener('blur', updateMainButton);
         });
         window.addEventListener('focus', updateMainButton);
-    
+
         form.addEventListener('submit', e => e.preventDefault());
-    
+
         tg.MainButton.onClick(() => {
             if (!validateForm()) return;
             const data = {};
@@ -193,7 +182,7 @@
                 tg.MainButton.hideProgress();
             }
         });
-    
+
         tg.onEvent('themeChanged', () => {
             document.body.style.backgroundColor = tg.themeParams.bg_color;
             document.body.style.color = tg.themeParams.text_color;
