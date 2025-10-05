@@ -119,14 +119,22 @@
                 position: "bottom"
             });
             tg.SecondaryButton.show();
-            tg.onEvent('secondaryButtonClicked', () => tg.close());
+            tg.onEvent('secondaryButtonClicked', () => {
+                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            });
             // Скрываем BackButton, чтобы не дублировать отмену в шапке
             if (tg.BackButton && tg.BackButton.hide) tg.BackButton.hide();
         } else {
             // Фолбэк: если SecondaryButton не поддерживается, показываем «Отмена» в шапке
             tg.BackButton.show();
             tg.BackButton.enable?.();
-            tg.BackButton.onClick(() => tg.close());
+            tg.BackButton.onClick(() => {
+                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            });
         }
 
         const form = document.getElementById('regForm');
