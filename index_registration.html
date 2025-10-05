@@ -94,6 +94,12 @@
         tg.ready();
         tg.expand();
 
+        // Всегда показываем и активируем кнопку "Отмена"
+        tg.BackButton.show();
+        tg.BackButton.enable();
+        tg.BackButton.onClick(() => tg.close());
+
+        // Применение темы
         document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
         document.body.style.color = tg.themeParams.text_color || '#000000';
 
@@ -123,7 +129,7 @@
             return valid;
         }
 
-        function updateButtons() {
+        function updateMainButton() {
             if (validateForm()) {
                 tg.MainButton.enable();
                 tg.MainButton.setParams({
@@ -141,17 +147,17 @@
 
         fields.forEach(id => {
             const input = document.getElementById(id);
-            input.addEventListener('input', updateButtons);
-            input.addEventListener('blur', updateButtons);
+            input.addEventListener('input', updateMainButton);
+            input.addEventListener('blur', updateMainButton);
         });
-        window.addEventListener('focus', updateButtons);
+        window.addEventListener('focus', updateMainButton);
 
         form.addEventListener('submit', e => e.preventDefault());
 
-        // Основная кнопка «Отправить»
+        // Настройка кнопки "Отправить"
         tg.MainButton.text = "Отправить";
         tg.MainButton.show();
-        updateButtons();
+        updateMainButton();
         tg.MainButton.onClick(() => {
             if (!validateForm()) return;
             const data = {};
@@ -168,14 +174,10 @@
             }
         });
 
-        // Кнопка «Отмена» через BackButton
-        tg.BackButton.show();
-        tg.BackButton.onClick(() => tg.close());
-
         tg.onEvent('themeChanged', () => {
             document.body.style.backgroundColor = tg.themeParams.bg_color;
             document.body.style.color = tg.themeParams.text_color;
-            updateButtons();
+            updateMainButton();
         });
     </script>
 </body>
