@@ -94,24 +94,22 @@
         tg.ready();
         tg.expand();
 
-        // Всегда показываем и активируем кнопку "Отмена"
-        tg.BackButton.show();
-        tg.BackButton.enable();
-        tg.BackButton.onClick(() => tg.close());
-
         // Применение темы
         document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
         document.body.style.color = tg.themeParams.text_color || '#000000';
 
+        // Показываем кнопки сразу
+        tg.BackButton.show();
+        tg.BackButton.enable();
+        tg.MainButton.show();
+        tg.MainButton.text = "Отправить";
+
+        tg.BackButton.onClick(() => tg.close());
+
         const form = document.getElementById('regForm');
-        const fields = [
-            'lastName','firstName','middleName',
-            'birthDate','manager','department','position'
-        ];
+        const fields = ['lastName','firstName','middleName','birthDate','manager','department','position'];
         const errors = {};
-        fields.forEach(id => {
-            errors[id] = document.getElementById(`${id}-error`);
-        });
+        fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
 
         function validateForm() {
             let valid = true;
@@ -132,16 +130,10 @@
         function updateMainButton() {
             if (validateForm()) {
                 tg.MainButton.enable();
-                tg.MainButton.setParams({
-                    color: '#28a745',
-                    text_color: '#ffffff'
-                });
+                tg.MainButton.setParams({ color: '#28a745', text_color: '#ffffff' });
             } else {
                 tg.MainButton.disable();
-                tg.MainButton.setParams({
-                    color: '#cccccc',
-                    text_color: '#666666'
-                });
+                tg.MainButton.setParams({ color: '#cccccc', text_color: '#666666' });
             }
         }
 
@@ -154,16 +146,10 @@
 
         form.addEventListener('submit', e => e.preventDefault());
 
-        // Настройка кнопки "Отправить"
-        tg.MainButton.text = "Отправить";
-        tg.MainButton.show();
-        updateMainButton();
         tg.MainButton.onClick(() => {
             if (!validateForm()) return;
             const data = {};
-            fields.forEach(id => {
-                data[id] = document.getElementById(id).value.trim();
-            });
+            fields.forEach(id => data[id] = document.getElementById(id).value.trim());
             data.user = tg.initDataUnsafe?.user;
             tg.MainButton.showProgress();
             try {
