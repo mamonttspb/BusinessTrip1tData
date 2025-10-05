@@ -93,25 +93,48 @@
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-
-        // Всегда показываем и активируем кнопку "Отмена"
-        tg.BackButton.show();
-        tg.BackButton.enable();
-        tg.BackButton.onClick(() => tg.close());
-
-        // Настройка кнопки "Отправить" (MainButton)
-        tg.MainButton.show();
-        tg.MainButton.text = "Отправить";
-
-        // Применение темы
+    
+        // Применение темы (без изменений)
         document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
         document.body.style.color = tg.themeParams.text_color || '#000000';
-
+    
+        // ИНИЦИАЛИЗАЦИЯ НИЖНИХ КНОПОК
+        // 1) Основная кнопка "Отправить": по умолчанию неактивна и серая, активируется при валидной форме
+        tg.MainButton.setParams({
+            text: "Отправить",
+            color: "#cccccc",
+            text_color: "#666666",
+            is_active: false, // эквивалент disable
+            is_visible: true
+        });
+        tg.MainButton.show();
+    
+        // 2) Вторая нижняя кнопка "Отмена": всегда видна и активна
+        // Проверим поддержку SecondaryButton (на старых клиентах может отсутствовать)
+        if (tg.SecondaryButton && tg.SecondaryButton.show) {
+            tg.SecondaryButton.setParams({
+                text: "Отмена",
+                color: "#d46a6a", // спокойный красный
+                text_color: "#ffffff",
+                is_active: true,
+                is_visible: true
+            });
+            tg.SecondaryButton.show();
+    
+            tg.onEvent('secondaryButtonClicked', () => {
+                tg.close();
+            });
+        } else {
+            // Фолбэк: если SecondaryButton не поддерживается, используем BackButton как «Отмена» в шапке
+            tg.BackButton.show();
+            tg.BackButton.onClick(() => tg.close());
+        }
+    
         const form = document.getElementById('regForm');
         const fields = ['lastName','firstName','middleName','birthDate','manager','department','position'];
         const errors = {};
         fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
-
+    
         function validateForm() {
             let valid = true;
             fields.forEach(id => {
@@ -127,26 +150,36 @@
             });
             return valid;
         }
-
-        function updateButtons() {
+    
+        function updateMainButton() {
             if (validateForm()) {
+                // активируем и красим «Отправить» в зелёный
+                tg.MainButton.setParams({
+                    color: '#28a745',
+                    text_color: '#ffffff',
+                    is_active: true
+                });
                 tg.MainButton.enable();
-                tg.MainButton.setParams({ color: '#28a745', text_color: '#ffffff' });
             } else {
+                // деактивируем и красим «Отправить» в серый
+                tg.MainButton.setParams({
+                    color: '#cccccc',
+                    text_color: '#666666',
+                    is_active: false
+                });
                 tg.MainButton.disable();
-                tg.MainButton.setParams({ color: '#cccccc', text_color: '#666666' });
             }
         }
-
+    
         fields.forEach(id => {
             const input = document.getElementById(id);
-            input.addEventListener('input', updateButtons);
-            input.addEventListener('blur', updateButtons);
+            input.addEventListener('input', updateMainButton);
+            input.addEventListener('blur', updateMainButton);
         });
-        window.addEventListener('focus', updateButtons);
-
+        window.addEventListener('focus', updateMainButton);
+    
         form.addEventListener('submit', e => e.preventDefault());
-
+    
         tg.MainButton.onClick(() => {
             if (!validateForm()) return;
             const data = {};
@@ -160,11 +193,11 @@
                 tg.MainButton.hideProgress();
             }
         });
-
+    
         tg.onEvent('themeChanged', () => {
             document.body.style.backgroundColor = tg.themeParams.bg_color;
             document.body.style.color = tg.themeParams.text_color;
-            updateButtons();
+            updateMainButton();
         });
     </script>
 </body>
