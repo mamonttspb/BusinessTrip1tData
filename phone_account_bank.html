@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Данные для перевода</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        .form-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:invalid {
+            border-color: #ff4444;
+        }
+        input:valid {
+            border-color: #00aa00;
+        }
+        .error-message {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Данные для перевода</h1>
+        <form id="transferForm">
+            <div class="form-group">
+                <label for="phoneNumber">Номер телефона *</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" required placeholder="89123456789 или +79123456789">
+                <div class="error-message" id="phoneNumber-error">Введите номер в формате 89123456789 или +79123456789</div>
+            </div>
+            <div class="form-group">
+                <label for="bank">Банк для перевода *</label>
+                <input type="text" id="bank" name="bank" required placeholder="Например: Сбербанк, ВТБ, Тинькофф">
+                <div class="error-message" id="bank-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="amount">Запрашиваемая сумма компенсации *</label>
+                <input type="text" id="amount" name="amount" required placeholder="Например: 15000,50">
+                <div class="error-message" id="amount-error">Введите сумму в формате: 1000,50</div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // Применение темы
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+        document.body.style.color = tg.themeParams.text_color || '#000000';
+
+        // КНОПКИ В НИЖНЕЙ ПАНЕЛИ
+        // Основная: «Отправить» — изначально серая и неактивна
+        tg.MainButton.setParams({
+            text: "Отправить",
+            color: "#cccccc",
+            text_color: "#666666"
+        });
+        tg.MainButton.show();
+        tg.MainButton.disable();
+
+        // Вторая кнопка: «Отмена» — всегда видима и активна, позиция ПОД основной
+        if (tg.SecondaryButton && tg.SecondaryButton.show) {
+            tg.SecondaryButton.setParams({
+                text: "Отмена",
+                color: "#d46a6a",
+                text_color: "#ffffff",
+                is_visible: true,
+                is_active: true,
+                position: "bottom"
+            });
+            tg.SecondaryButton.show();
+            tg.onEvent('secondaryButtonClicked', () => {
+                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            });
+            // Скрываем BackButton, чтобы не дублировать отмену в шапке
+            if (tg.BackButton && tg.BackButton.hide) tg.BackButton.hide();
+        } else {
+            // Фолбэк: если SecondaryButton не поддерживается, показываем «Отмена» в шапке
+            tg.BackButton.show();
+            tg.BackButton.enable?.();
+            tg.BackButton.onClick(() => {
+                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            });
+        }
+
+        const form = document.getElementById('transferForm');
+        const fields = ['phoneNumber', 'bank', 'amount'];
+        const errors = {};
+        fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
+
+        // Валидация номера телефона
+        function validatePhoneNumber(phone) {
+            // Формат 89xxxxxxxxx (11 цифр, начинается с 89)
+            const format1 = /^89\d{9}$/;
+            // Формат +xxxxxxxxxxx (+ и 11 цифр)
+            const format2 = /^\+\d{11}$/;
+            return format1.test(phone) || format2.test(phone);
+        }
+
+        // Валидация и форматирование суммы
+        function formatAmount(value) {
+            // Заменяем точку на запятую
+            let formatted = value.replace('.', ',');
+            
+            // Удаляем все символы кроме цифр и запятой
+            formatted = formatted.replace(/[^\d,]/g, '');
+            
+            // Проверяем что запятая только одна
+            const commaCount = (formatted.match(/,/g) || []).length;
+            if (commaCount > 1) {
+                // Оставляем только первую запятую
+                const firstCommaIndex = formatted.indexOf(',');
+                formatted = formatted.slice(0, firstCommaIndex + 1) + formatted.slice(firstCommaIndex + 1).replace(/,/g, '');
+            }
+            
+            // Проверяем что после запятой максимум 2 цифры
+            if (formatted.includes(',')) {
+                const parts = formatted.split(',');
+                if (parts[1] && parts[1].length > 2) {
+                    parts[1] = parts[1].slice(0, 2);
+                    formatted = parts.join(',');
+                }
+            }
+            
+            return formatted;
+        }
+
+        function validateAmount(amount) {
+            // Проверяем что это число с запятой или без
+            const regex = /^\d+(?:,\d{1,2})?$/;
+            return regex.test(amount) && parseFloat(amount.replace(',', '.')) > 0;
+        }
+
+        function validateField(id) {
+            const input = document.getElementById(id);
+            const value = input.value.trim();
+            let isValid = true;
+
+            switch(id) {
+                case 'phoneNumber':
+                    isValid = validatePhoneNumber(value);
+                    break;
+                case 'bank':
+                    isValid = value.length > 0;
+                    break;
+                case 'amount':
+                    isValid = validateAmount(value);
+                    break;
+            }
+
+            if (isValid) {
+                errors[id].style.display = 'none';
+                input.style.borderColor = '#00aa00';
+            } else {
+                errors[id].style.display = 'block';
+                input.style.borderColor = '#ff4444';
+            }
+
+            return isValid;
+        }
+
+        function validateForm() {
+            let valid = true;
+            fields.forEach(id => {
+                if (!validateField(id)) {
+                    valid = false;
+                }
+            });
+            return valid;
+        }
+
+        function updateMainButton() {
+            if (validateForm()) {
+                tg.MainButton.enable();
+                tg.MainButton.setParams({ color: '#28a745', text_color: '#ffffff' });
+            } else {
+                tg.MainButton.disable();
+                tg.MainButton.setParams({ color: '#cccccc', text_color: '#666666' });
+            }
+        }
+
+        // Обработчики событий для полей
+        document.getElementById('phoneNumber').addEventListener('input', function() {
+            // Удаляем все символы кроме цифр, + и пробелов
+            let value = this.value.replace(/[^\d+\s]/g, '');
+            
+            // Если начинается с 8, заменяем на +7
+            if (value.startsWith('8') && value.length > 1) {
+                value = '+7' + value.slice(1);
+            }
+            
+            this.value = value;
+            updateMainButton();
+        });
+
+        document.getElementById('bank').addEventListener('input', updateMainButton);
+
+        document.getElementById('amount').addEventListener('input', function() {
+            this.value = formatAmount(this.value);
+            updateMainButton();
+        });
+
+        fields.forEach(id => {
+            const input = document.getElementById(id);
+            input.addEventListener('blur', updateMainButton);
+        });
+
+        window.addEventListener('focus', updateMainButton);
+
+        form.addEventListener('submit', e => e.preventDefault());
+
+        tg.MainButton.onClick(() => {
+            if (!validateForm()) return;
+            
+            const data = {};
+            fields.forEach(id => data[id] = document.getElementById(id).value.trim());
+            data.user = tg.initDataUnsafe?.user;
+            
+            tg.MainButton.showProgress();
+            try {
+                tg.sendData(JSON.stringify(data));
+                tg.close();
+            } catch {
+                tg.MainButton.hideProgress();
+            }
+        });
+
+        tg.onEvent('themeChanged', () => {
+            document.body.style.backgroundColor = tg.themeParams.bg_color;
+            document.body.style.color = tg.themeParams.text_color;
+            updateMainButton();
+        });
+    </script>
+</body>
+</html>
