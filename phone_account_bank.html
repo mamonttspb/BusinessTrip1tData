@@ -105,7 +105,7 @@
             });
             tg.SecondaryButton.show();
             tg.onEvent('secondaryButtonClicked', () => {
-                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
+                const payload = { action: "cancel_phone_account_bank", user: tg.initDataUnsafe?.user };
                 tg.sendData(JSON.stringify(payload));
                 tg.close();
             });
@@ -116,7 +116,7 @@
             tg.BackButton.show();
             tg.BackButton.enable?.();
             tg.BackButton.onClick(() => {
-                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
+                const payload = { action: "cancel_phone_account_bank", user: tg.initDataUnsafe?.user };
                 tg.sendData(JSON.stringify(payload));
                 tg.close();
             });
