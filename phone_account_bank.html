@@ -57,6 +57,11 @@
                 <div class="error-message" id="phoneNumber-error">Введите корректный номер телефона</div>
             </div>
             <div class="form-group">
+                <label for="telegram">Личный телеграмм *</label>
+                <input type="text" id="telegram" name="telegram" required placeholder="@username, username или https://t.me/username">
+                <div class="error-message" id="telegram-error">Введите корректный Telegram</div>
+            </div>
+            <div class="form-group">
                 <label for="bank">Банк для перевода *</label>
                 <input type="text" id="bank" name="bank" required placeholder="Введите название банка">
                 <div class="error-message" id="bank-error">Обязательное поле</div>
@@ -118,7 +123,7 @@
         }
 
         const form = document.getElementById('transferForm');
-        const fields = ['phoneNumber', 'bank', 'amount'];
+        const fields = ['phoneNumber', 'telegram', 'bank', 'amount'];
         const errors = {};
         fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
 
@@ -129,6 +134,50 @@
             // Формат +цифры (до 30 символов)
             const format2 = /^\+\d{1,30}$/;
             return format1.test(phone) || format2.test(phone);
+        }
+
+        // Валидация Telegram username
+        function validateTelegram(telegram) {
+            if (!telegram) return false;
+            
+            // Извлекаем username из разных форматов
+            let username = telegram.trim();
+            
+            // Формат: https://t.me/username или http://t.me/username
+            const urlMatch = username.match(/^https?:\/\/t\.me\/([a-zA-Z0-9_]{5,32})$/);
+            if (urlMatch) {
+                return true;
+            }
+            
+            // Формат: @username
+            if (username.startsWith('@')) {
+                username = username.substring(1);
+            }
+            
+            // Username должен быть от 5 до 32 символов и содержать только буквы, цифры и подчеркивания
+            const telegramRegex = /^[a-zA-Z0-9_]{5,32}$/;
+            return telegramRegex.test(username);
+        }
+
+        // Извлечение username из любого формата
+        function extractTelegramUsername(telegram) {
+            if (!telegram) return '';
+            
+            let username = telegram.trim();
+            
+            // Формат: https://t.me/username или http://t.me/username
+            const urlMatch = username.match(/^https?:\/\/t\.me\/([a-zA-Z0-9_]{5,32})$/);
+            if (urlMatch) {
+                return '@' + urlMatch[1];
+            }
+            
+            // Формат: @username
+            if (username.startsWith('@')) {
+                return username;
+            }
+            
+            // Формат: username
+            return '@' + username;
         }
 
         // Валидация суммы
@@ -174,6 +223,18 @@
                 phoneInput.style.borderColor = '#00aa00';
             }
 
+            // Валидация Telegram
+            const telegramInput = document.getElementById('telegram');
+            const telegramValue = telegramInput.value.trim();
+            if (!telegramValue || !validateTelegram(telegramValue)) {
+                errors['telegram'].style.display = 'block';
+                telegramInput.style.borderColor = '#ff4444';
+                valid = false;
+            } else {
+                errors['telegram'].style.display = 'none';
+                telegramInput.style.borderColor = '#00aa00';
+            }
+
             // Валидация банка
             const bankInput = document.getElementById('bank');
             const bankValue = bankInput.value.trim();
@@ -215,6 +276,9 @@
         document.getElementById('phoneNumber').addEventListener('input', updateMainButton);
         document.getElementById('phoneNumber').addEventListener('blur', updateMainButton);
 
+        document.getElementById('telegram').addEventListener('input', updateMainButton);
+        document.getElementById('telegram').addEventListener('blur', updateMainButton);
+
         document.getElementById('bank').addEventListener('input', updateMainButton);
         document.getElementById('bank').addEventListener('blur', updateMainButton);
 
@@ -234,6 +298,7 @@
             
             const data = {
                 phoneNumber: document.getElementById('phoneNumber').value.trim(),
+                telegram: extractTelegramUsername(document.getElementById('telegram').value.trim()),
                 bank: document.getElementById('bank').value.trim(),
                 amount: document.getElementById('amount').value.trim(),
                 user: tg.initDataUnsafe?.user
