@@ -51,41 +51,67 @@
     <div class="form-container">
         <h1>Заявка на регистрацию</h1>
         <form id="regForm">
+            <!-- Фамилия -->
             <div class="form-group">
                 <label for="lastName">Фамилия *</label>
                 <input type="text" id="lastName" name="lastName" required placeholder="Введите фамилию">
                 <div class="error-message" id="lastName-error">Обязательное поле</div>
             </div>
+            <!-- Имя -->
             <div class="form-group">
                 <label for="firstName">Имя *</label>
                 <input type="text" id="firstName" name="firstName" required placeholder="Введите имя">
                 <div class="error-message" id="firstName-error">Обязательное поле</div>
             </div>
+            <!-- Отчество -->
             <div class="form-group">
                 <label for="middleName">Отчество *</label>
                 <input type="text" id="middleName" name="middleName" required placeholder="Введите отчество">
                 <div class="error-message" id="middleName-error">Обязательное поле</div>
             </div>
+            <!-- Дата рождения -->
             <div class="form-group">
                 <label for="birthDate">Дата рождения *</label>
                 <input type="date" id="birthDate" name="birthDate" required>
                 <div class="error-message" id="birthDate-error">Обязательное поле</div>
             </div>
+            <!-- Личный Telegram -->
             <div class="form-group">
                 <label for="personalTelegram">Личный Telegram *</label>
-                <input type="text" id="personalTelegram" name="personalTelegram" required placeholder="@username или https://t.me/username">
-                <div class="error-message" id="personalTelegram-error">Введите @username или https://t.me/username</div>
+                <input
+                    type="text"
+                    id="personalTelegram"
+                    name="personalTelegram"
+                    required
+                    placeholder="@username или https://t.me/username"
+                    pattern="^@([a-zA-Z0-9_]{2,})$|^https:\/\/t\.me\/([a-zA-Z0-9_]{2,})$"
+                >
+                <div class="error-message" id="personalTelegram-error">
+                    Введите @username или https://t.me/username
+                </div>
             </div>
+            <!-- Телеграм руководителя -->
             <div class="form-group">
                 <label for="manager">Телеграм руководителя *</label>
-                <input type="text" id="manager" name="manager" required placeholder="Например: https://t.me/Ivanov">
-                <div class="error-message" id="manager-error">Обязательное поле</div>
+                <input
+                    type="text"
+                    id="manager"
+                    name="manager"
+                    required
+                    placeholder="@username или https://t.me/username"
+                    pattern="^@([a-zA-Z0-9_]{2,})$|^https:\/\/t\.me\/([a-zA-Z0-9_]{2,})$"
+                >
+                <div class="error-message" id="manager-error">
+                    Введите @username или https://t.me/username
+                </div>
             </div>
+            <!-- Отдел или проект -->
             <div class="form-group">
                 <label for="department">Отдел или проект *</label>
                 <input type="text" id="department" name="department" required placeholder="Введите отдел или проект">
                 <div class="error-message" id="department-error">Обязательное поле</div>
             </div>
+            <!-- Должность -->
             <div class="form-group">
                 <label for="position">Должность *</label>
                 <input type="text" id="position" name="position" required placeholder="Введите должность">
@@ -99,21 +125,15 @@
         tg.ready();
         tg.expand();
 
-        // Применение темы (без изменений)
+        // Тема
         document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
         document.body.style.color = tg.themeParams.text_color || '#000000';
 
-        // КНОПКИ В НИЖНЕЙ ПАНЕЛИ
-        // Основная: «Отправить» — изначально серая и неактивна
-        tg.MainButton.setParams({
-            text: "Отправить",
-            color: "#cccccc",
-            text_color: "#666666"
-        });
+        // Кнопки
+        tg.MainButton.setParams({ text: "Отправить", color: "#cccccc", text_color: "#666666" });
         tg.MainButton.show();
         tg.MainButton.disable();
 
-        // Вторая кнопка: «Отмена» — всегда видима и активна, позиция ПОД основной
         if (tg.SecondaryButton && tg.SecondaryButton.show) {
             tg.SecondaryButton.setParams({
                 text: "Отмена",
@@ -125,19 +145,15 @@
             });
             tg.SecondaryButton.show();
             tg.onEvent('secondaryButtonClicked', () => {
-                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
-                tg.sendData(JSON.stringify(payload));
+                tg.sendData(JSON.stringify({ action: "cancel", user: tg.initDataUnsafe?.user }));
                 tg.close();
             });
-            // Скрываем BackButton, чтобы не дублировать отмену в шапке
             if (tg.BackButton && tg.BackButton.hide) tg.BackButton.hide();
         } else {
-            // Фолбэк: если SecondaryButton не поддерживается, показываем «Отмена» в шапке
             tg.BackButton.show();
             tg.BackButton.enable?.();
             tg.BackButton.onClick(() => {
-                const payload = { action: "cancel", user: tg.initDataUnsafe?.user };
-                tg.sendData(JSON.stringify(payload));
+                tg.sendData(JSON.stringify({ action: "cancel", user: tg.initDataUnsafe?.user }));
                 tg.close();
             });
         }
@@ -147,20 +163,11 @@
         const errors = {};
         fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
 
-        // Функция валидации Telegram username
         function isValidTelegram(value) {
             value = value.trim();
-            if (!value) return false;
-            
-            // Проверка формата @username (минимум 2 символа после @)
             const usernamePattern = /^@[a-zA-Z0-9_]{2,}$/;
-            if (usernamePattern.test(value)) return true;
-            
-            // Проверка формата https://t.me/username (минимум 2 символа после /)
             const urlPattern = /^https:\/\/t\.me\/[a-zA-Z0-9_]{2,}$/;
-            if (urlPattern.test(value)) return true;
-            
-            return false;
+            return usernamePattern.test(value) || urlPattern.test(value);
         }
 
         function validateForm() {
@@ -168,12 +175,9 @@
             fields.forEach(id => {
                 const input = document.getElementById(id);
                 let fieldValid = input.checkValidity();
-                
-                // Дополнительная валидация для поля personalTelegram
-                if (id === 'personalTelegram' && fieldValid) {
+                if ((id === 'personalTelegram' || id === 'manager') && fieldValid) {
                     fieldValid = isValidTelegram(input.value);
                 }
-                
                 if (!fieldValid) {
                     errors[id].style.display = 'block';
                     input.style.borderColor = '#ff4444';
@@ -207,16 +211,12 @@
 
         tg.MainButton.onClick(() => {
             if (!validateForm()) return;
+            tg.MainButton.showProgress();
             const data = {};
             fields.forEach(id => data[id] = document.getElementById(id).value.trim());
             data.user = tg.initDataUnsafe?.user;
-            tg.MainButton.showProgress();
-            try {
-                tg.sendData(JSON.stringify(data));
-                tg.close();
-            } catch {
-                tg.MainButton.hideProgress();
-            }
+            tg.sendData(JSON.stringify(data));
+            tg.close();
         });
 
         tg.onEvent('themeChanged', () => {
