@@ -72,6 +72,11 @@
                 <div class="error-message" id="birthDate-error">Обязательное поле</div>
             </div>
             <div class="form-group">
+                <label for="personalTelegram">Личный Telegram *</label>
+                <input type="text" id="personalTelegram" name="personalTelegram" required placeholder="@username или https://t.me/username">
+                <div class="error-message" id="personalTelegram-error">Введите @username (мин. 2 символа) или https://t.me/username</div>
+            </div>
+            <div class="form-group">
                 <label for="manager">Телеграм руководителя *</label>
                 <input type="text" id="manager" name="manager" required placeholder="Например: https://t.me/Ivanov">
                 <div class="error-message" id="manager-error">Обязательное поле</div>
@@ -138,15 +143,38 @@
         }
 
         const form = document.getElementById('regForm');
-        const fields = ['lastName','firstName','middleName','birthDate','manager','department','position'];
+        const fields = ['lastName','firstName','middleName','birthDate','personalTelegram','manager','department','position'];
         const errors = {};
         fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
+
+        // Функция валидации Telegram username
+        function isValidTelegram(value) {
+            value = value.trim();
+            if (!value) return false;
+            
+            // Проверка формата @username (минимум 2 символа после @)
+            const usernamePattern = /^@[a-zA-Z0-9_]{2,}$/;
+            if (usernamePattern.test(value)) return true;
+            
+            // Проверка формата https://t.me/username (минимум 2 символа после /)
+            const urlPattern = /^https:\/\/t\.me\/[a-zA-Z0-9_]{2,}$/;
+            if (urlPattern.test(value)) return true;
+            
+            return false;
+        }
 
         function validateForm() {
             let valid = true;
             fields.forEach(id => {
                 const input = document.getElementById(id);
-                if (!input.checkValidity()) {
+                let fieldValid = input.checkValidity();
+                
+                // Дополнительная валидация для поля personalTelegram
+                if (id === 'personalTelegram' && fieldValid) {
+                    fieldValid = isValidTelegram(input.value);
+                }
+                
+                if (!fieldValid) {
                     errors[id].style.display = 'block';
                     input.style.borderColor = '#ff4444';
                     valid = false;
