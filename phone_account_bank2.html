@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Данные для перевода</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        .form-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:invalid {
+            border-color: #ff4444;
+        }
+        input:valid {
+            border-color: #00aa00;
+        }
+        .error-message {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Данные для перевода</h1>
+        <form id="transferForm">
+            <div class="form-group">
+                <label for="phoneNumber">Номер телефона *</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" required placeholder="89123456789 или +79123456789">
+                <div class="error-message" id="phoneNumber-error">Введите корректный номер телефона</div>
+            </div>
+            <div class="form-group">
+                <label for="bank">Банк для перевода *</label>
+                <input type="text" id="bank" name="bank" required placeholder="Введите название банка">
+                <div class="error-message" id="bank-error">Обязательное поле</div>
+            </div>
+            <div class="form-group">
+                <label for="amount">Запрашиваемая сумма компенсации *</label>
+                <input type="text" id="amount" name="amount" required placeholder="1000,50">
+                <div class="error-message" id="amount-error">Введите корректную сумму</div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // Применение темы
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+        document.body.style.color = tg.themeParams.text_color || '#000000';
+
+        // КНОПКИ В НИЖНЕЙ ПАНЕЛИ
+        // Основная: «Отправить» — изначально серая и неактивна
+        tg.MainButton.setParams({
+            text: "Отправить",
+            color: "#cccccc",
+            text_color: "#666666"
+        });
+        tg.MainButton.show();
+        tg.MainButton.disable();
+
+        // Вторая кнопка: «Отмена» — всегда видима и активна, позиция ПОД основной
+        if (tg.SecondaryButton && tg.SecondaryButton.show) {
+            tg.SecondaryButton.setParams({
+                text: "Отмена",
+                color: "#d46a6a",
+                text_color: "#ffffff",
+                is_visible: true,
+                is_active: true,
+                position: "bottom"
+            });
+            tg.SecondaryButton.show();
+            tg.onEvent('secondaryButtonClicked', () => {
+                const payload = { action: "cancel_phone_account_bank", user: tg.initDataUnsafe?.user };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            });
+            // Скрываем BackButton, чтобы не дублировать отмену в шапке
+            if (tg.BackButton && tg.BackButton.hide) tg.BackButton.hide();
+        } else {
+            // Фолбэк: если SecondaryButton не поддерживается, показываем «Отмена» в шапке
+            tg.BackButton.show();
+            tg.BackButton.enable?.();
+            tg.BackButton.onClick(() => {
+                const payload = { action: "cancel_phone_account_bank", user: tg.initDataUnsafe?.user };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            });
+        }
+
+        const form = document.getElementById('transferForm');
+        const fields = ['phoneNumber', 'bank', 'amount'];
+        const errors = {};
+        fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
+
+        // Валидация номера телефона
+        function validatePhoneNumber(phone) {
+            // Формат 89xxxxxxxxx (11 цифр)
+            const format1 = /^89\d{9}$/;
+            // Формат +цифры (до 30 символов)
+            const format2 = /^\+\d{1,30}$/;
+            return format1.test(phone) || format2.test(phone);
+        }
+
+        // Валидация суммы
+        function validateAmount(amount) {
+            // Разрешаем только цифры, запятую и точку
+            const cleanAmount = amount.replace(/[^0-9.,]/g, '');
+            // Проверяем формат: цифры, опционально запятая и до 2 цифр после
+            const amountRegex = /^\d+([,]\d{0,2})?$/;
+            return amountRegex.test(cleanAmount) && cleanAmount.length > 0;
+        }
+
+        // Форматирование суммы (замена точки на запятую)
+        function formatAmount(input) {
+            let value = input.value;
+            // Заменяем точку на запятую
+            value = value.replace('.', ',');
+            // Удаляем все символы кроме цифр и запятой
+            value = value.replace(/[^0-9,]/g, '');
+            // Проверяем, что запятая только одна и в правильном месте
+            const parts = value.split(',');
+            if (parts.length > 2) {
+                value = parts[0] + ',' + parts[1];
+            }
+            // Ограничиваем до 2 знаков после запятой
+            if (parts.length === 2 && parts[1].length > 2) {
+                value = parts[0] + ',' + parts[1].substring(0, 2);
+            }
+            input.value = value;
+        }
+
+        function validateForm() {
+            let valid = true;
+            
+            // Валидация номера телефона
+            const phoneInput = document.getElementById('phoneNumber');
+            const phoneValue = phoneInput.value.trim();
+            if (!phoneValue || !validatePhoneNumber(phoneValue)) {
+                errors['phoneNumber'].style.display = 'block';
+                phoneInput.style.borderColor = '#ff4444';
+                valid = false;
+            } else {
+                errors['phoneNumber'].style.display = 'none';
+                phoneInput.style.borderColor = '#00aa00';
+            }
+
+            // Валидация банка
+            const bankInput = document.getElementById('bank');
+            const bankValue = bankInput.value.trim();
+            if (!bankValue) {
+                errors['bank'].style.display = 'block';
+                bankInput.style.borderColor = '#ff4444';
+                valid = false;
+            } else {
+                errors['bank'].style.display = 'none';
+                bankInput.style.borderColor = '#00aa00';
+            }
+
+            // Валидация суммы
+            const amountInput = document.getElementById('amount');
+            const amountValue = amountInput.value.trim();
+            if (!amountValue || !validateAmount(amountValue)) {
+                errors['amount'].style.display = 'block';
+                amountInput.style.borderColor = '#ff4444';
+                valid = false;
+            } else {
+                errors['amount'].style.display = 'none';
+                amountInput.style.borderColor = '#00aa00';
+            }
+
+            return valid;
+        }
+
+        function updateMainButton() {
+            if (validateForm()) {
+                tg.MainButton.enable();
+                tg.MainButton.setParams({ color: '#28a745', text_color: '#ffffff' });
+            } else {
+                tg.MainButton.disable();
+                tg.MainButton.setParams({ color: '#cccccc', text_color: '#666666' });
+            }
+        }
+
+        // Обработчики событий для полей
+        document.getElementById('phoneNumber').addEventListener('input', updateMainButton);
+        document.getElementById('phoneNumber').addEventListener('blur', updateMainButton);
+
+        document.getElementById('bank').addEventListener('input', updateMainButton);
+        document.getElementById('bank').addEventListener('blur', updateMainButton);
+
+        const amountInput = document.getElementById('amount');
+        amountInput.addEventListener('input', (e) => {
+            formatAmount(e.target);
+            updateMainButton();
+        });
+        amountInput.addEventListener('blur', updateMainButton);
+
+        window.addEventListener('focus', updateMainButton);
+
+        form.addEventListener('submit', e => e.preventDefault());
+
+        tg.MainButton.onClick(() => {
+            if (!validateForm()) return;
+            
+            const data = {
+                phoneNumber: document.getElementById('phoneNumber').value.trim(),
+                bank: document.getElementById('bank').value.trim(),
+                amount: document.getElementById('amount').value.trim(),
+                user: tg.initDataUnsafe?.user
+            };
+            
+            tg.MainButton.showProgress();
+            try {
+                tg.sendData(JSON.stringify(data));
+                tg.close();
+            } catch {
+                tg.MainButton.hideProgress();
+            }
+        });
+
+        tg.onEvent('themeChanged', () => {
+            document.body.style.backgroundColor = tg.themeParams.bg_color;
+            document.body.style.color = tg.themeParams.text_color;
+            updateMainButton();
+        });
+    </script>
+</body>
+</html>
