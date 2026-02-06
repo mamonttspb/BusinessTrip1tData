@@ -83,11 +83,11 @@
                     id="personalTelegram"
                     name="personalTelegram"
                     required
-                    placeholder="@username или https://t.me/username"
-                    pattern="^@([a-zA-Z0-9_]{2,})$|^https:\/\/t\.me\/([a-zA-Z0-9_]{2,})$"
+                    placeholder="https://t.me/username"
+                    pattern="^https://t\\.me/[a-zA-Z0-9_]{2,}$"
                 >
                 <div class="error-message" id="personalTelegram-error">
-                    Введите @username или https://t.me/username
+                    Введите в формате https://t.me/username (минимум 2 символа в нике, без пробелов)
                 </div>
             </div>
             <!-- Телеграм руководителя -->
@@ -98,11 +98,11 @@
                     id="manager"
                     name="manager"
                     required
-                    placeholder="@username или https://t.me/username"
-                    pattern="^@([a-zA-Z0-9_]{2,})$|^https:\/\/t\.me\/([a-zA-Z0-9_]{2,})$"
+                    placeholder="https://t.me/username;https://t.me/username2"
+                    pattern="^https://t\\.me/[a-zA-Z0-9_]{2,}(;https://t\\.me/[a-zA-Z0-9_]{2,})*$"
                 >
                 <div class="error-message" id="manager-error">
-                    Введите @username или https://t.me/username
+                    Формат: https://t.me/boss1;https://t.me/boss2 (без пробелов, минимум 2 символа в нике)
                 </div>
             </div>
             <!-- Отдел или проект -->
@@ -163,21 +163,166 @@
         const errors = {};
         fields.forEach(id => errors[id] = document.getElementById(`${id}-error`));
 
-        function isValidTelegram(value) {
-            value = value.trim();
-            const usernamePattern = /^@[a-zA-Z0-9_]{2,}$/;
-            const urlPattern = /^https:\/\/t\.me\/[a-zA-Z0-9_]{2,}$/;
-            return usernamePattern.test(value) || urlPattern.test(value);
+        const TELEGRAM_PREFIX = 'https://t.me/';
+
+        // Вспомогательная функция извлечения username
+        function extractUsername(raw) {
+            if (!raw) return '';
+            let s = raw.trim();
+
+            // Удаляем пробелы
+            s = s.replace(/\s+/g, '');
+
+            // Удаляем варианты префикса
+            s = s.replace(/^https?:\/\/t\.me\//i, '');
+            s = s.replace(/^t\.me\//i, '');
+
+            // Удаляем все последующие вхождения префикса внутри строки (на случай "https://t.me/https://t.me/user")
+            s = s.replace(/https?:\/\/t\.me\//gi, '');
+            s = s.replace(/t\.me\//gi, '');
+
+            // Удаляем ведущие @
+            s = s.replace(/^@+/, '');
+
+            // Оставляем только допустимые символы ника
+            s = s.replace(/[^a-zA-Z0-9_]/g, '');
+
+            return s;
+        }
+
+        // Санитизация личного телеграма
+        function sanitizePersonalTelegram() {
+            const input = document.getElementById('personalTelegram');
+            if (!input) return;
+
+            let raw = input.value || '';
+            // Удаляем пробелы
+            raw = raw.replace(/\s+/g, '');
+
+            let username;
+            if (raw.startsWith(TELEGRAM_PREFIX)) {
+                username = raw.slice(TELEGRAM_PREFIX.length);
+            } else {
+                username = raw;
+            }
+
+            username = extractUsername(username);
+            const newVal = TELEGRAM_PREFIX + username;
+
+            if (input.value !== newVal) {
+                input.value = newVal;
+                // Каретка в конец, чтобы не лезть в середину префикса
+                if (document.activeElement === input) {
+                    const pos = input.value.length;
+                    input.setSelectionRange(pos, pos);
+                }
+            }
+        }
+
+        // Санитизация телеграма руководителей (поддержка ; и автоматический префикс)
+        function sanitizeManagerTelegram() {
+            const input = document.getElementById('manager');
+            if (!input) return;
+
+            let raw = input.value || '';
+            // Удаляем пробелы
+            raw = raw.replace(/\s+/g, '');
+
+            // Гарантируем, что строка не пустая и первый префикс существует
+            if (!raw) {
+                input.value = TELEGRAM_PREFIX;
+                return;
+            }
+
+            const rawParts = raw.split(';');
+            const parts = [];
+
+            rawParts.forEach((partRaw, index) => {
+                let part = partRaw || '';
+
+                // Удаляем пробелы на всякий
+                part = part.replace(/\s+/g, '');
+
+                // Если начинается с нашего префикса — отбрасываем его для извлечения ника
+                if (part.startsWith(TELEGRAM_PREFIX)) {
+                    part = part.slice(TELEGRAM_PREFIX.length);
+                }
+
+                const username = extractUsername(part);
+
+                // Для всех сегментов мы подставляем наш префикс
+                // Если username пустой (пользователь только что ввёл ;) — будет "https://t.me/"
+                parts.push(TELEGRAM_PREFIX + username);
+            });
+
+            // Если после split было пустое последнее значение из-за завершающего ';',
+            // то мы уже превратили его в "...;https://t.me/". Это нужно для UX ("после ; сразу префикс").
+
+            const newVal = parts.join(';');
+
+            if (input.value !== newVal) {
+                input.value = newVal;
+                if (document.activeElement === input) {
+                    const pos = input.value.length;
+                    input.setSelectionRange(pos, pos);
+                }
+            }
+
+            // Гарантируем, что первый префикс всегда есть (нельзя удалить целиком)
+            if (!input.value.startsWith(TELEGRAM_PREFIX)) {
+                input.value = TELEGRAM_PREFIX + input.value.replace(/^@+/, '');
+            }
+        }
+
+        // Валидация личного телеграма
+        function isValidPersonalTelegram(value) {
+            if (!value) return false;
+            if (/\s/.test(value)) return false;
+            if (!value.startsWith(TELEGRAM_PREFIX)) return false;
+
+            const username = value.slice(TELEGRAM_PREFIX.length);
+            const re = /^[a-zA-Z0-9_]{2,}$/;
+            return re.test(username);
+        }
+
+        // Валидация телеграма руководителя (несколько через ;)
+        function isValidManagerTelegram(value) {
+            if (!value) return false;
+            if (/\s/.test(value)) return false;
+
+            const parts = value.split(';');
+            if (parts.length === 0) return false;
+
+            const re = /^[a-zA-Z0-9_]{2,}$/;
+
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (!part.startsWith(TELEGRAM_PREFIX)) return false;
+
+                const username = part.slice(TELEGRAM_PREFIX.length);
+                // Ник минимум 2 символа, только [a-zA-Z0-9_]
+                if (!re.test(username)) return false;
+            }
+
+            return true;
         }
 
         function validateForm() {
             let valid = true;
+
             fields.forEach(id => {
                 const input = document.getElementById(id);
-                let fieldValid = input.checkValidity();
-                if ((id === 'personalTelegram' || id === 'manager') && fieldValid) {
-                    fieldValid = isValidTelegram(input.value);
+                let fieldValid = input.checkValidity(); // required и т.п.
+
+                if (id === 'personalTelegram') {
+                    // Доп. проверка формата
+                    fieldValid = fieldValid && isValidPersonalTelegram(input.value);
                 }
+
+                if (id === 'manager') {
+                    fieldValid = fieldValid && isValidManagerTelegram(input.value);
+                }
+
                 if (!fieldValid) {
                     errors[id].style.display = 'block';
                     input.style.borderColor = '#ff4444';
@@ -187,6 +332,7 @@
                     input.style.borderColor = '#00aa00';
                 }
             });
+
             return valid;
         }
 
@@ -200,6 +346,7 @@
             }
         }
 
+        // Навешиваем стандартные слушатели
         fields.forEach(id => {
             const input = document.getElementById(id);
             input.addEventListener('input', updateMainButton);
@@ -207,14 +354,45 @@
         });
         window.addEventListener('focus', updateMainButton);
 
+        // Инициализация и дополнительные слушатели для Telegram-полей
+        const personalInput = document.getElementById('personalTelegram');
+        const managerInput = document.getElementById('manager');
+
+        // Закреплённый префикс по умолчанию
+        personalInput.value = TELEGRAM_PREFIX;
+        managerInput.value = TELEGRAM_PREFIX;
+
+        personalInput.addEventListener('input', () => {
+            sanitizePersonalTelegram();
+            updateMainButton();
+        });
+
+        managerInput.addEventListener('input', () => {
+            sanitizeManagerTelegram();
+            updateMainButton();
+        });
+
+        // На blur тоже можно подчистить значения
+        personalInput.addEventListener('blur', sanitizePersonalTelegram);
+        managerInput.addEventListener('blur', sanitizeManagerTelegram);
+
         form.addEventListener('submit', e => e.preventDefault());
 
         tg.MainButton.onClick(() => {
+            // Перед валидацией и отправкой ещё раз жёстко нормализуем поля
+            sanitizePersonalTelegram();
+            sanitizeManagerTelegram();
+
             if (!validateForm()) return;
+
             tg.MainButton.showProgress();
             const data = {};
             fields.forEach(id => data[id] = document.getElementById(id).value.trim());
             data.user = tg.initDataUnsafe?.user;
+
+            // На этом этапе:
+            // - personalTelegram гарантированно вида https://t.me/username без пробелов
+            // - manager гарантированно вида https://t.me/boss1;https://t.me/boss2 ... без пробелов и без "пустых" начальников
             tg.sendData(JSON.stringify(data));
             tg.close();
         });
