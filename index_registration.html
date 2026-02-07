@@ -25,7 +25,8 @@
             margin-bottom: 5px;
             font-weight: 500;
         }
-        input {
+        input[type="text"],
+        input[type="date"] {
             width: 100%;
             padding: 12px;
             border: 1px solid var(--tg-theme-button-color, #0088cc);
@@ -44,6 +45,21 @@
             font-size: 14px;
             margin-top: 5px;
             display: none;
+        }
+        /* Оформление чекбокса руководителя */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+        }
+        .hint-text {
+            font-size: 13px;
+            color: var(--tg-theme-hint_color, #888888);
         }
     </style>
 </head>
@@ -84,7 +100,7 @@
                 name="personalTelegram"
                 required
                 placeholder="https://t.me/username"
-                pattern="^https://t\.me/[a-zA-Z0-9_]{2,}$"
+                pattern="^https://t\\.me/[a-zA-Z0-9_]{2,}$"
               >
               <div class="error-message" id="personalTelegram-error">
                 Введите в формате https://t.me/username (минимум 2 символа в нике, без пробелов)
@@ -100,7 +116,7 @@
                 name="manager"
                 required
                 placeholder="https://t.me/boss1;https://t.me/boss2"
-                pattern="^https://t\.me/[a-zA-Z0-9_]{2,}(;https://t\.me/[a-zA-Z0-9_]{2,})*$"
+                pattern="^https://t\\.me/[a-zA-Z0-9_]{2,}(;https://t\\.me/[a-zA-Z0-9_]{2,})*$"
               >
               <div class="error-message" id="manager-error">
                 Формат: https://t.me/boss1;https://t.me/boss2 (без пробелов, минимум 2 символа в нике)
@@ -118,6 +134,17 @@
                 <label for="position">Должность *</label>
                 <input type="text" id="position" name="position" required placeholder="Введите должность">
                 <div class="error-message" id="position-error">Обязательное поле</div>
+            </div>
+
+            <!-- Являюсь руководителем -->
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="isManager" name="isManager">
+                    Являюсь руководителем
+                </label>
+                <div class="hint-text">
+                    Выбрав данный параметр, вы подтверждаете, что имеете право одобрять командировки и компенсации
+                </div>
             </div>
         </form>
     </div>
@@ -170,14 +197,12 @@
     if (!raw) return '';
 
     let s = String(raw);
-    s = s.replace(/\s+/g, '');          // убираем пробелы
-    s = s.replace(/^@+/, '');           // ведущие @
+    s = s.replace(/\\s+/g, '');
+    s = s.replace(/^@+/, '');
 
-    // вырезаем t.me/ и https://t.me/ в любом месте, чтобы не было дублей
-    s = s.replace(/https?:\/\/t\.me\//gi, '');
-    s = s.replace(/t\.me\//gi, '');
+    s = s.replace(/https?:\\/\\/t\\.me\\//gi, '');
+    s = s.replace(/t\\.me\\//gi, '');
 
-    // оставляем только допустимые символы username
     s = s.replace(/[^a-zA-Z0-9_]/g, '');
 
     return s;
@@ -199,24 +224,19 @@
       const start = input.selectionStart ?? 0;
       const end = input.selectionEnd ?? 0;
 
-      // Нельзя удалять внутри закреплённого префикса
       if ((e.key === 'Backspace' || e.key === 'Delete')) {
-        // Если выделение или курсор заходит в префикс — запрещаем
         if (start < minPos || end < minPos) {
           e.preventDefault();
           setCaretMin(input, minPos);
           return;
         }
 
-        // Спец-логика для manager: если строка заканчивается на ";https://t.me/" (пустой добавленный босс),
-        // то Backspace удаляет весь этот хвост (то самое "после ; можно удалить")
         if (allowRemoveTrailingBlock && e.key === 'Backspace') {
           const val = input.value || '';
           const suffix = ';' + TELEGRAM_PREFIX;
           if ((input.selectionStart === val.length) && val.endsWith(suffix)) {
             e.preventDefault();
             input.value = val.slice(0, -suffix.length);
-            // caret в конец
             const pos = input.value.length;
             input.setSelectionRange(pos, pos);
           }
@@ -224,7 +244,6 @@
       }
     });
 
-    // Не даём поставить курсор внутрь префикса
     const guard = () => setCaretMin(input, minPos);
     input.addEventListener('focus', guard);
     input.addEventListener('click', guard);
@@ -234,17 +253,16 @@
 
   function sanitizePersonal() {
     const input = document.getElementById('personalTelegram');
-    let v = (input.value || '').replace(/\s+/g, '');
+    let v = (input.value || '').replace(/\\s+/g, '');
 
     if (!v.startsWith(TELEGRAM_PREFIX)) {
-      // если префикс повреждён/удалён — принудительно восстанавливаем
       v = TELEGRAM_PREFIX + v;
     }
 
-    // убираем любые повторные вхождения префикса после начала
-    v = TELEGRAM_PREFIX + v.slice(TELEGRAM_PREFIX.length).replace(/https?:\/\/t\.me\//gi, '').replace(/t\.me\//gi, '');
+    v = TELEGRAM_PREFIX + v.slice(TELEGRAM_PREFIX.length)
+      .replace(/https?:\\/\\/t\\.me\\//gi, '')
+      .replace(/t\\.me\\//gi, '');
 
-    // убираем @ и мусор в username
     const username = cleanUsername(v.slice(TELEGRAM_PREFIX.length));
     const newVal = TELEGRAM_PREFIX + username;
 
@@ -257,41 +275,30 @@
 
   function sanitizeManager() {
     const input = document.getElementById('manager');
-    let v = (input.value || '').replace(/\s+/g, '');
+    let v = (input.value || '').replace(/\\s+/g, '');
 
-    // всегда должен быть первый закреплённый префикс
     if (!v.startsWith(TELEGRAM_PREFIX)) {
       v = TELEGRAM_PREFIX + v;
     }
 
-    // запрет пробелов и ";;"
     v = v.replace(/;;+/g, ';');
 
-    // если пользователь только что ввёл ';' в конец — сразу добавляем префикс
     if (v.endsWith(';')) {
       v += TELEGRAM_PREFIX;
     }
 
-    // Нормализуем сегменты: всегда ";https://t.me/" между начальниками
-    // Разбираем по ';' и приводим каждый кусок к "https://t.me/<username>"
     const partsRaw = v.split(';');
 
     const parts = partsRaw.map((pRaw, idx) => {
-      let p = (pRaw || '').replace(/\s+/g, '');
-
-      // для любого сегмента: убираем все варианты префикса, потом чистим username и добавляем наш
-      // (это уберёт вставленное пользователем https://t.me/ во 2-м боссе и не даст дублей)
+      let p = (pRaw || '').replace(/\\s+/g, '');
       if (p.startsWith(TELEGRAM_PREFIX)) p = p.slice(TELEGRAM_PREFIX.length);
       const username = cleanUsername(p);
       return TELEGRAM_PREFIX + username;
     });
 
-    // Склеиваем обратно
     let newVal = parts.join(';');
 
-    // Если пользователь вставил в середину "https://t.me/" руками — мы уже подчистили,
-    // но дополнительно уберём любые дубли префикса после ';'
-    newVal = newVal.replace(/(;https?:\/\/t\.me\/)+/gi, ';' + TELEGRAM_PREFIX);
+    newVal = newVal.replace(/(;https?:\\/\\/t\\.me\\/)+/gi, ';' + TELEGRAM_PREFIX);
 
     if (input.value !== newVal) {
       input.value = newVal;
@@ -302,7 +309,7 @@
 
   function isValidPersonalTelegram(value) {
     if (!value) return false;
-    if (/\s/.test(value)) return false;
+    if (/\\s/.test(value)) return false;
     if (!value.startsWith(TELEGRAM_PREFIX)) return false;
     const username = value.slice(TELEGRAM_PREFIX.length);
     return USER_RE.test(username);
@@ -310,9 +317,8 @@
 
   function isValidManagerTelegram(value) {
     if (!value) return false;
-    if (/\s/.test(value)) return false;
+    if (/\\s/.test(value)) return false;
 
-    // не должно заканчиваться на ';' или на голый префикс последнего сегмента
     if (value.endsWith(';')) return false;
     if (value.endsWith(TELEGRAM_PREFIX)) return false;
 
@@ -359,7 +365,6 @@
     }
   }
 
-  // Общие слушатели: для всех кроме telegram-полей (чтобы не было двойной валидации до санитайза)
   fields
     .filter(id => id !== 'personalTelegram' && id !== 'manager')
     .forEach(id => {
@@ -371,26 +376,21 @@
   window.addEventListener('focus', updateMainButton);
   form.addEventListener('submit', e => e.preventDefault());
 
-  // Telegram inputs
   const personalInput = document.getElementById('personalTelegram');
   const managerInput = document.getElementById('manager');
 
-  // Стартовые значения (показать закреплённый префикс)
   if (!personalInput.value) personalInput.value = TELEGRAM_PREFIX;
   if (!managerInput.value) managerInput.value = TELEGRAM_PREFIX;
 
-  // Защита префикса
   protectPrefix(personalInput, TELEGRAM_PREFIX, false);
   protectPrefix(managerInput, TELEGRAM_PREFIX, true);
 
-  // Санитайз + обновление
   personalInput.addEventListener('input', () => { sanitizePersonal(); updateMainButton(); });
   personalInput.addEventListener('blur', () => { sanitizePersonal(); updateMainButton(); });
 
   managerInput.addEventListener('input', () => { sanitizeManager(); updateMainButton(); });
   managerInput.addEventListener('blur', () => { sanitizeManager(); updateMainButton(); });
 
-  // Первичная нормализация и отрисовка валидности
   sanitizePersonal();
   sanitizeManager();
   updateMainButton();
@@ -407,7 +407,9 @@
     fields.forEach(id => data[id] = document.getElementById(id).value.trim());
     data.user = tg.initDataUnsafe?.user;
 
-    // На выходе:
+    // новый флаг: true/false
+    data.isManager = document.getElementById('isManager').checked;
+
     // personalTelegram: https://t.me/username
     // manager: https://t.me/boss1;https://t.me/boss2;...
     tg.sendData(JSON.stringify(data));
